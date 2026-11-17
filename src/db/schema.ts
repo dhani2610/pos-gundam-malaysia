@@ -6,6 +6,7 @@ import {
   decimal,
   boolean,
   datetime,
+  date,
   index,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
@@ -253,6 +254,45 @@ export const stockInItems = mysqlTable(
   ]
 );
 
+export const vouchers = mysqlTable(
+  "vouchers",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    idCabang: int("id_cabang").default(0).notNull(), // 0 = all branches
+    code: varchar("code", { length: 50 }).notNull(),
+    name: varchar("name", { length: 150 }).notNull(),
+    discountType: varchar("discount_type", { length: 20 })
+      .default("percent")
+      .notNull(), // 'percent' | 'rm'
+    discountValue: decimal("discount_value", { precision: 15, scale: 2 })
+      .default("0.00")
+      .notNull(),
+    minSpend: decimal("min_spend", { precision: 15, scale: 2 })
+      .default("0.00")
+      .notNull(),
+    maxDiscount: decimal("max_discount", { precision: 15, scale: 2 })
+      .default("0.00")
+      .notNull(),
+    usageLimit: int("usage_limit").default(0).notNull(), // 0 = unlimited
+    usageCount: int("usage_count").default(0).notNull(),
+    startDate: date("start_date", { mode: "string" }).notNull(),
+    endDate: date("end_date", { mode: "string" }).notNull(),
+    isActive: int("is_active").default(1).notNull(),
+    createdAt: datetime("created_at")
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+    updatedAt: datetime("updated_at")
+      .default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
+      .notNull(),
+    deletedAt: datetime("deleted_at"),
+    deletedBy: int("deleted_by"),
+  },
+  (table) => [
+    index("idx_vouchers_cabang_deleted").on(table.idCabang, table.deletedAt),
+    index("idx_vouchers_code").on(table.code),
+  ]
+);
+
 export const transactions = mysqlTable(
   "transactions",
   {
@@ -284,6 +324,14 @@ export const transactions = mysqlTable(
       .default("0.00")
       .notNull(),
     orderDiscountAmount: decimal("order_discount_amount", {
+      precision: 15,
+      scale: 2,
+    })
+      .default("0.00")
+      .notNull(),
+    voucherId: int("voucher_id"),
+    voucherCode: varchar("voucher_code", { length: 50 }),
+    voucherDiscountAmount: decimal("voucher_discount_amount", {
       precision: 15,
       scale: 2,
     })

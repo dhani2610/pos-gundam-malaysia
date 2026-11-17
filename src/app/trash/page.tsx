@@ -231,6 +231,7 @@ export default function TrashPage() {
             <SelectItem value="stock_ins">Stock In</SelectItem>
             <SelectItem value="users">Users</SelectItem>
             <SelectItem value="branches">Branches</SelectItem>
+            <SelectItem value="vouchers">Vouchers</SelectItem>
           </SelectContent>
         </Select>
       </div>

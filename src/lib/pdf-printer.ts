@@ -112,6 +112,11 @@ export function printReceiptInline(
             : ""
         }
         ${
+          Number(tx.voucherDiscountAmount || 0) > 0
+            ? `<div class="row"><span>Voucher Disc${tx.voucherCode ? ` (${tx.voucherCode})` : ""}:</span><span>-${formatRM(tx.voucherDiscountAmount)}</span></div>`
+            : ""
+        }
+        ${
           Number(tx.orderDiscountAmount || 0) > 0
             ? `<div class="row"><span>Total Discount${tx.orderDiscountType === "percent" ? ` (${Number(tx.orderDiscountValue)}%)` : ""}:</span><span>-${formatRM(tx.orderDiscountAmount)}</span></div>`
             : ""
@@ -236,6 +241,16 @@ export function downloadReceiptPdf(
   if (Number(tx.itemDiscountTotal || 0) > 0) {
     doc.text("Item Discounts:", 5, y);
     doc.text(`-${formatRM(tx.itemDiscountTotal)}`, 75, y, { align: "right" });
+    y += 4;
+  }
+
+  if (Number(tx.voucherDiscountAmount || 0) > 0) {
+    doc.text(
+      `Voucher Disc${tx.voucherCode ? ` (${tx.voucherCode})` : ""}:`,
+      5,
+      y
+    );
+    doc.text(`-${formatRM(tx.voucherDiscountAmount)}`, 75, y, { align: "right" });
     y += 4;
   }
 
@@ -392,15 +407,17 @@ export function exportSalesReportPdf(params: {
 
   const tableRows = transactions.map((tx: any, idx: number) => {
     const itemDisc = Number(tx.itemDiscountTotal || 0);
+    const voucherDisc = Number(tx.voucherDiscountAmount || 0);
     const ordDisc = Number(tx.orderDiscountAmount || 0);
     const totalDisc = Number(tx.discountTotal || 0);
-    let discDetail = `-${formatRM(totalDisc)}`;
-    if (itemDisc > 0 && ordDisc > 0) {
-      discDetail = `-${formatRM(totalDisc)} (Item: -${formatRM(itemDisc)} | Receipt: -${formatRM(ordDisc)})`;
-    } else if (ordDisc > 0) {
-      discDetail = `-${formatRM(totalDisc)} (Receipt Disc)`;
-    } else if (itemDisc > 0) {
-      discDetail = `-${formatRM(totalDisc)} (Item Disc)`;
+    const parts: string[] = [];
+    if (itemDisc > 0) parts.push(`Item: -${formatRM(itemDisc)}`);
+    if (voucherDisc > 0)
+      parts.push(`Voucher ${tx.voucherCode || ""}: -${formatRM(voucherDisc)}`);
+    if (ordDisc > 0) parts.push(`Receipt: -${formatRM(ordDisc)}`);
+    let discDetail = totalDisc > 0 ? `-${formatRM(totalDisc)}` : "-";
+    if (parts.length > 0) {
+      discDetail = `-${formatRM(totalDisc)} (${parts.join(" | ")})`;
     }
     return [
       idx + 1,

@@ -171,6 +171,17 @@ export function ReceiptModal({
                 </span>
               </div>
             )}
+            {Number(transaction.voucherDiscountAmount || 0) > 0 && (
+              <div className="flex justify-between text-emerald-600">
+                <span>
+                  Promo Voucher
+                  {transaction.voucherCode ? ` (${transaction.voucherCode})` : ""}
+                </span>
+                <span className="font-mono">
+                  -{formatRM(transaction.voucherDiscountAmount)}
+                </span>
+              </div>
+            )}
             {Number(transaction.orderDiscountAmount || 0) > 0 && (
               <div className="flex justify-between text-emerald-600">
                 <span>

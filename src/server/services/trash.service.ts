@@ -60,6 +60,12 @@ const ALLOWED_MODULES: Record<
     codeCol: "code",
     label: "Branches",
   },
+  vouchers: {
+    table: "vouchers",
+    titleCol: "name",
+    codeCol: "code",
+    label: "Vouchers",
+  },
 };
 
 export class TrashService {

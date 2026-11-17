@@ -22,6 +22,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { ReceiptModal } from "@/components/pos/receipt-modal";
 import { QuickCustomerModal } from "@/components/pos/quick-customer-modal";
 import { formatRM } from "@/lib/utils";
@@ -41,6 +48,13 @@ import {
   Package,
   Building2,
   Coins,
+  Ticket,
+  X,
+  Tag,
+  Loader2,
+  Clock,
+  Check,
+  Calendar,
 } from "lucide-react";
 
 export interface CartItem {
@@ -96,6 +110,13 @@ export function PosWorkspace({
   );
   const [orderDiscountInput, setOrderDiscountInput] = useState<string>("");
 
+  // Promotional Voucher State
+  const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
+  const [voucherCodeInput, setVoucherCodeInput] = useState<string>("");
+  const [appliedVoucher, setAppliedVoucher] = useState<any | null>(null);
+  const [validatingVoucher, setValidatingVoucher] = useState<boolean>(false);
+  const [voucherDialogOpen, setVoucherDialogOpen] = useState<boolean>(false);
+
   const [paymentMethod, setPaymentMethod] = useState<
     "cash" | "transfer" | "qr_pay"
   >("cash");
@@ -123,6 +144,7 @@ export function PosWorkspace({
         setSubCategories(json.data.subCategories || []);
         setBrands(json.data.brands || []);
         setCustomers(json.data.customers || []);
+        setAvailableVouchers(json.data.vouchers || []);
 
         const st = json.data.settings;
         if (st?.bankName) {
@@ -186,6 +208,20 @@ export function PosWorkspace({
         setSelectedBank(editingTransaction.bankAccountInfo);
       }
       setNotes(editingTransaction.notes || "");
+      if (editingTransaction.voucherCode) {
+        setAppliedVoucher({
+          id: editingTransaction.voucherId,
+          code: editingTransaction.voucherCode,
+          name: editingTransaction.voucherCode,
+          discountAmount: Number(editingTransaction.voucherDiscountAmount || 0),
+          discountType: "rm",
+          discountValue: Number(editingTransaction.voucherDiscountAmount || 0),
+        });
+        setVoucherCodeInput(editingTransaction.voucherCode);
+      } else {
+        setAppliedVoucher(null);
+        setVoucherCodeInput("");
+      }
     }
   }, [editingTransaction, products.length]);
 
@@ -376,41 +412,103 @@ export function PosWorkspace({
       Number((grossTotal - itemDiscountTotal).toFixed(2))
     );
 
+    let voucherDiscountAmount = 0;
+    if (appliedVoucher) {
+      if (appliedVoucher.minSpend > 0 && subtotalAfterItemDisc < appliedVoucher.minSpend) {
+        voucherDiscountAmount = 0;
+      } else if (appliedVoucher.discountType === "percent") {
+        voucherDiscountAmount = Number(
+          ((subtotalAfterItemDisc * Math.min(100, appliedVoucher.discountValue)) / 100).toFixed(2)
+        );
+        if (appliedVoucher.maxDiscount > 0 && voucherDiscountAmount > appliedVoucher.maxDiscount) {
+          voucherDiscountAmount = appliedVoucher.maxDiscount;
+        }
+      } else {
+        voucherDiscountAmount = Math.min(subtotalAfterItemDisc, appliedVoucher.discountValue);
+      }
+    }
+    voucherDiscountAmount = Number(voucherDiscountAmount.toFixed(2));
+
+    const subtotalAfterVoucher = Math.max(
+      0,
+      Number((subtotalAfterItemDisc - voucherDiscountAmount).toFixed(2))
+    );
+
     const rawOrdVal = Math.max(0, parseFloat(orderDiscountInput || "0") || 0);
     const orderDiscountAmount =
       orderDiscountType === "percent"
         ? Number(
             (
-              (subtotalAfterItemDisc * Math.min(100, rawOrdVal)) /
+              (subtotalAfterVoucher * Math.min(100, rawOrdVal)) /
               100
             ).toFixed(2)
           )
-        : Number(Math.min(subtotalAfterItemDisc, rawOrdVal).toFixed(2));
+        : Number(Math.min(subtotalAfterVoucher, rawOrdVal).toFixed(2));
 
     const discountTotal = Number(
-      (itemDiscountTotal + orderDiscountAmount).toFixed(2)
+      (itemDiscountTotal + voucherDiscountAmount + orderDiscountAmount).toFixed(2)
     );
     const netTotal = Math.max(
       0,
       Number((grossTotal - discountTotal).toFixed(2))
     );
 
-    // Calculate sen remainder on subtotalAfterItemDisc (e.g., RM 20.60 -> 0.60 sen)
+    // Calculate sen remainder on net before order discount (e.g., RM 20.60 -> 0.60 sen)
     const senRemainder = Number(
-      (subtotalAfterItemDisc - Math.floor(subtotalAfterItemDisc)).toFixed(2)
+      (subtotalAfterVoucher - Math.floor(subtotalAfterVoucher)).toFixed(2)
     );
 
     return {
       grossTotal,
       itemDiscountTotal,
       subtotalAfterItemDisc,
+      voucherDiscountAmount,
+      subtotalAfterVoucher,
       orderDiscountValue: rawOrdVal,
       orderDiscountAmount,
       discountTotal,
       netTotal,
       senRemainder,
     };
-  }, [cart, orderDiscountType, orderDiscountInput]);
+  }, [cart, orderDiscountType, orderDiscountInput, appliedVoucher]);
+
+  const handleApplyVoucher = async (codeToUse?: string) => {
+    const code = (codeToUse || voucherCodeInput).trim().toUpperCase();
+    if (!code) {
+      toast.error("Please enter a voucher code");
+      return;
+    }
+    if (totals.subtotalAfterItemDisc <= 0) {
+      toast.error("Subtotal must be greater than RM 0 to apply voucher");
+      return;
+    }
+
+    setValidatingVoucher(true);
+    try {
+      const res = await fetch("/api/vouchers/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          idCabang: effectiveBranchId,
+          subtotal: totals.subtotalAfterItemDisc,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+
+      setAppliedVoucher(json.data);
+      setVoucherCodeInput(json.data.code);
+      setVoucherDialogOpen(false);
+      toast.success(
+        `Applied voucher "${json.data.code}": -RM ${Number(json.data.discountAmount).toFixed(2)} off!`
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Invalid voucher code");
+    } finally {
+      setValidatingVoucher(false);
+    }
+  };
 
   useEffect(() => {
     if (paymentMethod === "transfer" || paymentMethod === "qr_pay") {
@@ -473,6 +571,9 @@ export function PosWorkspace({
         customerId: selectedCust ? selectedCust.id : null,
         customerName: selectedCust ? selectedCust.name : "Walk-in Customer",
         customerPhone: selectedCust ? selectedCust.phone : "",
+        voucherId: appliedVoucher?.id || null,
+        voucherCode: appliedVoucher?.code || null,
+        voucherDiscountAmount: totals.voucherDiscountAmount,
         orderDiscountType,
         orderDiscountValue: totals.orderDiscountValue,
         orderDiscountAmount: totals.orderDiscountAmount,
@@ -534,6 +635,8 @@ export function PosWorkspace({
       setTransferAmount("");
       setSelectedCustomerId("walk-in");
       setNotes("");
+      setAppliedVoucher(null);
+      setVoucherCodeInput("");
       loadPosBundle();
     } catch (err: any) {
       toast.error(err.message);
@@ -1064,6 +1167,100 @@ export function PosWorkspace({
               </div>
             )}
 
+            {/* Voucher Code Box */}
+            <div className="rounded-xl border border-blue-200 bg-white p-3 shadow-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Ticket className="h-4 w-4 text-blue-600" />
+                  Promo Voucher
+                </Label>
+                {availableVouchers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setVoucherDialogOpen(true)}
+                    className="h-6 px-2 text-[11px] text-blue-600 hover:text-blue-800 hover:bg-blue-50 font-medium inline-flex items-center gap-1 rounded transition-colors"
+                  >
+                    <Tag className="h-3 w-3" />
+                    Browse Vouchers ({availableVouchers.length})
+                  </button>
+                )}
+              </div>
+
+              {appliedVoucher ? (
+                <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="h-7 w-7 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                      %
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-emerald-900 font-mono text-xs">
+                          {appliedVoucher.code}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] py-0 px-1 border-emerald-300 text-emerald-700 bg-white">
+                          {appliedVoucher.discountType === "percent"
+                            ? `${appliedVoucher.discountValue}% OFF`
+                            : `RM ${Number(appliedVoucher.discountValue).toFixed(2)} OFF`}
+                        </Badge>
+                      </div>
+                      <span className="text-[10px] text-emerald-700 block truncate max-w-[180px]">
+                        {appliedVoucher.name}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-emerald-700 text-sm">
+                      -{formatRM(totals.voucherDiscountAmount)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedVoucher(null);
+                        setVoucherCodeInput("");
+                        toast.info("Voucher removed");
+                      }}
+                      className="p-1 hover:bg-emerald-200/60 rounded text-emerald-700 transition-colors"
+                      title="Remove voucher"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-1.5">
+                  <div className="relative flex-1">
+                    <Ticket className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <Input
+                      placeholder="Enter voucher code (e.g. GUNDAM10)..."
+                      value={voucherCodeInput}
+                      onChange={(e) => setVoucherCodeInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleApplyVoucher();
+                        }
+                      }}
+                      className="pl-8 h-8 font-mono text-xs uppercase"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleApplyVoucher()}
+                    disabled={validatingVoucher || !voucherCodeInput.trim()}
+                    className="h-8 px-3 text-xs border-blue-300 text-blue-700 hover:bg-blue-50"
+                  >
+                    {validatingVoucher ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      "Apply"
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {/* Order Totals & Additional Total Receipt Discount (% or RM & Sen + Round Sen Helper) */}
             <div className="rounded-xl bg-blue-50/50 p-3.5 border border-blue-200 space-y-2 text-xs">
               <div className="flex justify-between text-slate-600">
@@ -1088,6 +1285,19 @@ export function PosWorkspace({
                   {formatRM(totals.subtotalAfterItemDisc)}
                 </span>
               </div>
+
+              {/* Voucher Discount Row (if applied) */}
+              {totals.voucherDiscountAmount > 0 && (
+                <div className="flex justify-between text-emerald-600 font-medium">
+                  <span className="flex items-center gap-1">
+                    <Ticket className="h-3 w-3" />
+                    Voucher Discount ({appliedVoucher?.code})
+                  </span>
+                  <span className="font-mono font-semibold">
+                    -{formatRM(totals.voucherDiscountAmount)}
+                  </span>
+                </div>
+              )}
 
               {/* Additional Total / Receipt Discount Row (% or RM & Sen) */}
               <div className="pt-1.5 border-t border-blue-100 space-y-1.5">
@@ -1386,6 +1596,110 @@ export function PosWorkspace({
         onOpenChange={setReceiptOpen}
         transaction={completedTx}
       />
+
+      {/* Available Vouchers Picker Modal */}
+      <Dialog open={voucherDialogOpen} onOpenChange={setVoucherDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-950">
+              <Ticket className="h-5 w-5 text-blue-600" />
+              Available Promo Vouchers
+            </DialogTitle>
+            <DialogDescription>
+              Select an active voucher code to apply discount to this transaction.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+            {availableVouchers.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-xs">
+                <Ticket className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+                No active promo vouchers currently available for this branch.
+              </div>
+            ) : (
+              availableVouchers.map((v) => {
+                const isSelected = appliedVoucher?.code === v.code;
+                const minSpendMet =
+                  !v.minSpend || totals.subtotalAfterItemDisc >= Number(v.minSpend);
+
+                return (
+                  <div
+                    key={v.id}
+                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                      isSelected
+                        ? "bg-emerald-50/80 border-emerald-300 shadow-xs ring-1 ring-emerald-400"
+                        : "bg-white hover:bg-blue-50/50 border-slate-200"
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-extrabold text-sm text-blue-950 bg-blue-100/70 px-2 py-0.5 rounded border border-blue-200">
+                          {v.code}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="font-bold text-[11px] border-emerald-300 text-emerald-700 bg-emerald-50"
+                        >
+                          {v.discountType === "percent"
+                            ? `${v.discountValue}% OFF`
+                            : `RM ${Number(v.discountValue).toFixed(2)} OFF`}
+                        </Badge>
+                      </div>
+                      <div className="font-medium text-xs text-slate-800">
+                        {v.name}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 font-mono">
+                        {Number(v.minSpend) > 0 && (
+                          <span>Min Spend: {formatRM(Number(v.minSpend))}</span>
+                        )}
+                        {v.discountType === "percent" && Number(v.maxDiscount) > 0 && (
+                          <span>Max Disc: {formatRM(Number(v.maxDiscount))}</span>
+                        )}
+                        {(v.startDate || v.endDate) && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-slate-400" />
+                            {v.startDate || "Any"} to {v.endDate || "Forever"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      {isSelected ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setAppliedVoucher(null);
+                            setVoucherCodeInput("");
+                            toast.info("Voucher removed");
+                          }}
+                          className="h-8 px-2.5 text-xs text-emerald-700 border-emerald-300 bg-emerald-100/50 hover:bg-emerald-200/60 font-semibold"
+                        >
+                          <Check className="h-3.5 w-3.5 mr-1" />
+                          Applied
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="mecha"
+                          disabled={validatingVoucher || !minSpendMet}
+                          onClick={() => handleApplyVoucher(v.code)}
+                          className="h-8 px-3 text-xs font-semibold"
+                        >
+                          {minSpendMet ? "Use Code" : "Under Min Spend"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

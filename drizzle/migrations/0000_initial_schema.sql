@@ -151,6 +151,28 @@ CREATE TABLE IF NOT EXISTS `stock_in_items` (
   INDEX `idx_stock_in_items_product` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `vouchers` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `id_cabang` INT NOT NULL DEFAULT 0,
+  `code` VARCHAR(50) NOT NULL,
+  `name` VARCHAR(150) NOT NULL,
+  `discount_type` VARCHAR(20) NOT NULL DEFAULT 'percent',
+  `discount_value` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `min_spend` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `max_discount` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `usage_limit` INT NOT NULL DEFAULT 0,
+  `usage_count` INT NOT NULL DEFAULT 0,
+  `start_date` DATE NOT NULL,
+  `end_date` DATE NOT NULL,
+  `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted_at` DATETIME NULL,
+  `deleted_by` INT NULL,
+  INDEX `idx_vouchers_cabang_deleted` (`id_cabang`, `deleted_at`),
+  INDEX `idx_vouchers_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `transactions` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `id_cabang` INT NOT NULL,
@@ -164,6 +186,9 @@ CREATE TABLE IF NOT EXISTS `transactions` (
   `order_discount_type` VARCHAR(20) NOT NULL DEFAULT 'rm',
   `order_discount_value` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `order_discount_amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `voucher_id` INT NULL,
+  `voucher_code` VARCHAR(50) NULL,
+  `voucher_discount_amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `discount_total` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `net_total` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `payment_method` VARCHAR(30) NOT NULL DEFAULT 'cash',

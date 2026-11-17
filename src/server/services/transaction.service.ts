@@ -19,6 +19,9 @@ export class TransactionService {
              t.order_discount_type as orderDiscountType,
              t.order_discount_value as orderDiscountValue,
              t.order_discount_amount as orderDiscountAmount,
+             t.voucher_id as voucherId,
+             t.voucher_code as voucherCode,
+             t.voucher_discount_amount as voucherDiscountAmount,
              t.discount_total as discountTotal,
              t.net_total as netTotal,
              t.payment_method as paymentMethod, t.cash_amount as cashAmount, t.transfer_amount as transferAmount,
@@ -86,6 +89,9 @@ export class TransactionService {
              t.order_discount_type as orderDiscountType,
              t.order_discount_value as orderDiscountValue,
              t.order_discount_amount as orderDiscountAmount,
+             t.voucher_id as voucherId,
+             t.voucher_code as voucherCode,
+             t.voucher_discount_amount as voucherDiscountAmount,
              t.discount_total as discountTotal,
              t.net_total as netTotal,
              t.payment_method as paymentMethod, t.cash_amount as cashAmount, t.transfer_amount as transferAmount,
@@ -173,6 +179,30 @@ export class TransactionService {
       }
 
       const subtotalAfterItemDisc = Math.max(0, grossTotal - itemDiscountTotal);
+
+      // Voucher Discount
+      let voucherId = dto.voucherId || null;
+      let voucherCode = dto.voucherCode?.trim().toUpperCase() || null;
+      let voucherDiscountAmount = Math.max(
+        0,
+        Number(dto.voucherDiscountAmount || 0)
+      );
+
+      if (voucherCode && !voucherId) {
+        const [vRows]: any = await conn.query(
+          `SELECT id, usage_limit, usage_count FROM vouchers WHERE UPPER(code) = ? AND deleted_at IS NULL`,
+          [voucherCode]
+        );
+        if (vRows[0]) {
+          voucherId = vRows[0].id;
+        }
+      }
+
+      const subtotalAfterVoucher = Math.max(
+        0,
+        subtotalAfterItemDisc - voucherDiscountAmount
+      );
+
       const orderDiscountType =
         dto.orderDiscountType === "percent" ? "percent" : "rm";
       const orderDiscountValue = Math.max(
@@ -183,14 +213,14 @@ export class TransactionService {
         orderDiscountType === "percent"
           ? Number(
               (
-                (subtotalAfterItemDisc * Math.min(100, orderDiscountValue)) /
+                (subtotalAfterVoucher * Math.min(100, orderDiscountValue)) /
                 100
               ).toFixed(2)
             )
-          : Math.min(subtotalAfterItemDisc, orderDiscountValue);
+          : Math.min(subtotalAfterVoucher, orderDiscountValue);
 
       const discountTotal = Number(
-        (itemDiscountTotal + orderDiscountAmount).toFixed(2)
+        (itemDiscountTotal + voucherDiscountAmount + orderDiscountAmount).toFixed(2)
       );
       const netTotal = Math.max(0, grossTotal - discountTotal);
 
@@ -220,9 +250,10 @@ export class TransactionService {
       const [txRes]: any = await conn.query(
         `INSERT INTO transactions
          (id_cabang, invoice_no, user_id, customer_id, customer_name, customer_phone,
-          gross_total, item_discount_total, order_discount_type, order_discount_value, order_discount_amount, discount_total, net_total,
+          gross_total, item_discount_total, order_discount_type, order_discount_value, order_discount_amount,
+          voucher_id, voucher_code, voucher_discount_amount, discount_total, net_total,
           payment_method, cash_amount, transfer_amount, bank_account_info, change_amount, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           dto.idCabang,
           invoiceNo,
@@ -235,6 +266,9 @@ export class TransactionService {
           orderDiscountType,
           orderDiscountValue,
           orderDiscountAmount,
+          voucherId,
+          voucherCode,
+          voucherDiscountAmount,
           discountTotal,
           netTotal,
           dto.paymentMethod,
@@ -247,6 +281,13 @@ export class TransactionService {
       );
 
       const txId = txRes.insertId;
+
+      if (voucherId) {
+        await conn.query(
+          `UPDATE vouchers SET usage_count = usage_count + 1 WHERE id = ?`,
+          [voucherId]
+        );
+      }
 
       for (const item of dto.items) {
         const customPrice = Number(item.customPrice);
@@ -410,6 +451,30 @@ export class TransactionService {
       }
 
       const subtotalAfterItemDisc = Math.max(0, grossTotal - itemDiscountTotal);
+
+      // Voucher Discount
+      let voucherId = dto.voucherId || null;
+      let voucherCode = dto.voucherCode?.trim().toUpperCase() || null;
+      let voucherDiscountAmount = Math.max(
+        0,
+        Number(dto.voucherDiscountAmount || 0)
+      );
+
+      if (voucherCode && !voucherId) {
+        const [vRows]: any = await conn.query(
+          `SELECT id FROM vouchers WHERE UPPER(code) = ? AND deleted_at IS NULL`,
+          [voucherCode]
+        );
+        if (vRows[0]) {
+          voucherId = vRows[0].id;
+        }
+      }
+
+      const subtotalAfterVoucher = Math.max(
+        0,
+        subtotalAfterItemDisc - voucherDiscountAmount
+      );
+
       const orderDiscountType =
         dto.orderDiscountType === "percent" ? "percent" : "rm";
       const orderDiscountValue = Math.max(
@@ -420,14 +485,14 @@ export class TransactionService {
         orderDiscountType === "percent"
           ? Number(
               (
-                (subtotalAfterItemDisc * Math.min(100, orderDiscountValue)) /
+                (subtotalAfterVoucher * Math.min(100, orderDiscountValue)) /
                 100
               ).toFixed(2)
             )
-          : Math.min(subtotalAfterItemDisc, orderDiscountValue);
+          : Math.min(subtotalAfterVoucher, orderDiscountValue);
 
       const discountTotal = Number(
-        (itemDiscountTotal + orderDiscountAmount).toFixed(2)
+        (itemDiscountTotal + voucherDiscountAmount + orderDiscountAmount).toFixed(2)
       );
       const netTotal = Math.max(0, grossTotal - discountTotal);
 
@@ -452,6 +517,7 @@ export class TransactionService {
         `UPDATE transactions
          SET customer_id = ?, customer_name = ?, customer_phone = ?,
              gross_total = ?, item_discount_total = ?, order_discount_type = ?, order_discount_value = ?, order_discount_amount = ?,
+             voucher_id = ?, voucher_code = ?, voucher_discount_amount = ?,
              discount_total = ?, net_total = ?,
              payment_method = ?, cash_amount = ?, transfer_amount = ?, bank_account_info = ?, change_amount = ?, notes = ?,
              updated_at = NOW()
@@ -465,6 +531,9 @@ export class TransactionService {
           orderDiscountType,
           orderDiscountValue,
           orderDiscountAmount,
+          voucherId,
+          voucherCode,
+          voucherDiscountAmount,
           discountTotal,
           netTotal,
           dto.paymentMethod,

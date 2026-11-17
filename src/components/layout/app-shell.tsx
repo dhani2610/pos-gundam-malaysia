@@ -53,6 +53,7 @@ import {
   PanelLeftOpen,
   ShieldCheck,
   Sparkles,
+  Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -98,6 +99,13 @@ const NAV_ITEMS: NavItem[] = [
     href: "/customers",
     icon: UserCheck,
     roles: ["admin", "employee"],
+    group: "Operations",
+  },
+  {
+    title: "Discount Vouchers",
+    href: "/vouchers",
+    icon: Ticket,
+    roles: ["admin"],
     group: "Operations",
   },
   {

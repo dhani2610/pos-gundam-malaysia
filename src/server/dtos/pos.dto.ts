@@ -18,6 +18,9 @@ export interface CreateTransactionDto {
   orderDiscountType?: "rm" | "percent";
   orderDiscountValue?: number;
   orderDiscountAmount?: number;
+  voucherId?: number | null;
+  voucherCode?: string | null;
+  voucherDiscountAmount?: number;
   paymentMethod: "cash" | "transfer" | "qr_pay";
   cashAmount: number;
   transferAmount: number;

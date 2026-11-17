@@ -3,11 +3,12 @@ import { ProductService } from "@/server/services/product.service";
 import { MasterService } from "@/server/services/master.service";
 import { CustomerService } from "@/server/services/customer.service";
 import { SettingsService } from "@/server/services/settings.service";
+import { VoucherService } from "@/server/services/voucher.service";
 
 export async function GET(req: NextRequest) {
   try {
     const idCabang = Number(req.nextUrl.searchParams.get("idCabang") || 1);
-    const [products, categories, subCategories, brands, customers, settings] =
+    const [products, categories, subCategories, brands, customers, settings, vouchers] =
       await Promise.all([
         ProductService.getProducts(idCabang),
         MasterService.getCategories(idCabang),
@@ -15,6 +16,7 @@ export async function GET(req: NextRequest) {
         MasterService.getBrands(idCabang),
         CustomerService.getCustomers(idCabang),
         SettingsService.getSettings(idCabang),
+        VoucherService.listVouchers(idCabang),
       ]);
 
     return NextResponse.json({
@@ -26,6 +28,7 @@ export async function GET(req: NextRequest) {
         brands,
         customers,
         settings,
+        vouchers: vouchers.filter((v: any) => v.status === "active"),
       },
     });
   } catch (err: any) {
