@@ -782,7 +782,7 @@ export default function VouchersPage() {
                   <div className="relative">
                     <Input
                       type="number"
-                      step={form.discountType === "percent" ? "1" : "0.01"}
+                      step="any"
                       min="0.01"
                       max={form.discountType === "percent" ? "100" : undefined}
                       value={form.discountValue}
@@ -806,7 +806,7 @@ export default function VouchersPage() {
                   </Label>
                   <Input
                     type="number"
-                    step="0.01"
+                    step="any"
                     min="0"
                     value={
                       form.discountType === "percent"
@@ -830,7 +830,7 @@ export default function VouchersPage() {
                   </Label>
                   <Input
                     type="number"
-                    step="0.01"
+                    step="any"
                     min="0"
                     value={form.minSpend}
                     onChange={(e) =>
