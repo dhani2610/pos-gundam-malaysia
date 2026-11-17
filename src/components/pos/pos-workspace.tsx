@@ -36,7 +36,6 @@ import {
   UserPlus,
   CreditCard,
   Banknote,
-  Split,
   QrCode,
   CheckCircle2,
   Package,
@@ -98,7 +97,7 @@ export function PosWorkspace({
   const [orderDiscountInput, setOrderDiscountInput] = useState<string>("");
 
   const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "transfer" | "split" | "qr_pay"
+    "cash" | "transfer" | "qr_pay"
   >("cash");
   const [cashAmount, setCashAmount] = useState<string>("");
   const [transferAmount, setTransferAmount] = useState<string>("");
@@ -417,28 +416,8 @@ export function PosWorkspace({
     if (paymentMethod === "transfer" || paymentMethod === "qr_pay") {
       setCashAmount("0");
       setTransferAmount(totals.netTotal.toFixed(2));
-    } else if (paymentMethod === "split") {
-      const currentCash = Number(cashAmount || 0);
-      const remainingTransfer = Math.max(0, totals.netTotal - currentCash);
-      setTransferAmount(remainingTransfer.toFixed(2));
     }
   }, [totals.netTotal, paymentMethod]);
-
-  const handleSplitCashChange = (val: string) => {
-    const cleaned = val.replace(/[^0-9.]/g, "");
-    setCashAmount(cleaned);
-    const numCash = Math.min(totals.netTotal, Number(cleaned || 0));
-    const remTransfer = Math.max(0, totals.netTotal - numCash);
-    setTransferAmount(remTransfer.toFixed(2));
-  };
-
-  const handleSplitTransferChange = (val: string) => {
-    const cleaned = val.replace(/[^0-9.]/g, "");
-    setTransferAmount(cleaned);
-    const numTransfer = Math.min(totals.netTotal, Number(cleaned || 0));
-    const remCash = Math.max(0, totals.netTotal - numTransfer);
-    setCashAmount(remCash.toFixed(2));
-  };
 
   const bankOptions = useMemo(() => {
     const list: string[] = [];
@@ -1194,10 +1173,10 @@ export function PosWorkspace({
               </div>
             </div>
 
-            {/* Payment Method Tabs (Cash / Transfer / QR Pay / Split) */}
+            {/* Payment Method Tabs (Cash / Transfer / QR Pay) */}
             <div className="space-y-3">
               <Label>Payment Method</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   type="button"
                   variant={paymentMethod === "cash" ? "mecha" : "outline"}
@@ -1227,23 +1206,6 @@ export function PosWorkspace({
                 >
                   <QrCode className="h-4 w-4 mr-1" />
                   QR Pay
-                </Button>
-                <Button
-                  type="button"
-                  variant={paymentMethod === "split" ? "mecha" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    setPaymentMethod("split");
-                    const half = Number((totals.netTotal / 2).toFixed(2));
-                    setCashAmount(String(half));
-                    setTransferAmount(
-                      String(Math.max(0, totals.netTotal - half).toFixed(2))
-                    );
-                  }}
-                  className="h-9 text-xs"
-                >
-                  <Split className="h-4 w-4 mr-1" />
-                  Split
                 </Button>
               </div>
 
@@ -1359,62 +1321,6 @@ export function PosWorkspace({
                     <span className="font-mono font-extrabold text-blue-700">
                       {formatRM(totals.netTotal)}
                     </span>
-                  </div>
-                </div>
-              )}
-
-              {/* SPLIT PAYMENT (AUTO-CALCULATING CASH + TRANSFER) */}
-              {paymentMethod === "split" && (
-                <div className="space-y-3 rounded-xl bg-muted/30 p-3 border border-border">
-                  <p className="text-[11px] text-muted-foreground">
-                    Enter either Cash or Transfer amount — the remaining balance
-                    auto-calculates to match{" "}
-                    <span className="font-mono font-bold text-foreground">
-                      {formatRM(totals.netTotal)}
-                    </span>
-                    .
-                  </p>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="space-y-1">
-                      <Label>Cash Portion (RM)</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={cashAmount}
-                        onChange={(e) => handleSplitCashChange(e.target.value)}
-                        className="font-mono font-bold"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>Transfer Portion (RM)</Label>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        value={transferAmount}
-                        onChange={(e) =>
-                          handleSplitTransferChange(e.target.value)
-                        }
-                        className="font-mono font-bold"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label>Store Bank Account (for Transfer Portion)</Label>
-                    <Select
-                      value={selectedBank || bankOptions[0]}
-                      onValueChange={setSelectedBank}
-                    >
-                      <SelectTrigger className="h-9 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {bankOptions.map((b, i) => (
-                          <SelectItem key={i} value={b} className="text-xs">
-                            {b}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
               )}

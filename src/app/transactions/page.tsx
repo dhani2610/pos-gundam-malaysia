@@ -129,7 +129,7 @@ export default function TransactionsPage() {
         return (
           <Badge
             variant={
-              m === "cash" ? "success" : m === "split" ? "warning" : "info"
+              m === "cash" ? "success" : m === "qr_pay" ? "outline" : "info"
             }
             className="uppercase font-mono text-[10px]"
           >

@@ -211,9 +211,6 @@ export class TransactionService {
         cashAmount = 0;
         transferAmount = netTotal;
         changeAmount = 0;
-      } else if (dto.paymentMethod === "split") {
-        transferAmount = Math.max(0, netTotal - cashAmount);
-        changeAmount = 0;
       }
 
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -448,9 +445,6 @@ export class TransactionService {
       ) {
         cashAmount = 0;
         transferAmount = netTotal;
-        changeAmount = 0;
-      } else if (dto.paymentMethod === "split") {
-        transferAmount = Math.max(0, netTotal - cashAmount);
         changeAmount = 0;
       }
 

@@ -18,7 +18,7 @@ export interface CreateTransactionDto {
   orderDiscountType?: "rm" | "percent";
   orderDiscountValue?: number;
   orderDiscountAmount?: number;
-  paymentMethod: "cash" | "transfer" | "split" | "qr_pay";
+  paymentMethod: "cash" | "transfer" | "qr_pay";
   cashAmount: number;
   transferAmount: number;
   bankAccountInfo?: string;

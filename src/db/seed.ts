@@ -247,7 +247,7 @@ async function seed() {
   await connection.query(`
     INSERT INTO transactions (id, id_cabang, invoice_no, user_id, customer_id, customer_name, customer_phone, gross_total, discount_total, net_total, payment_method, cash_amount, transfer_amount, bank_account_info, change_amount, notes, created_at) VALUES
     (1, 1, 'INV-KL-20261116-0001', 2, 1, 'Hathaway Noa', '+60 12-901 2233', 418.00, 18.00, 400.00, 'cash', 450.00, 0.00, NULL, 50.00, 'Member discount applied', NOW()),
-    (2, 1, 'INV-KL-20261116-0002', 2, 2, 'Miorine Rembran', '+60 17-445 8890', 695.00, 25.00, 670.00, 'split', 200.00, 470.00, 'Maybank - 514012349988', 0.00, 'Split payment Cash + Maybank QR/Transfer', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
+    (2, 1, 'INV-KL-20261116-0002', 2, 2, 'Miorine Rembran', '+60 17-445 8890', 695.00, 25.00, 670.00, 'qr_pay', 0.00, 670.00, 'Maybank - 514012349988', 0.00, 'DuitNow QR Pay received', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
     (3, 1, 'INV-KL-20261115-0003', 3, 3, 'Setsuna F. Seiei', '+60 19-882 3311', 493.50, 13.50, 480.00, 'transfer', 0.00, 480.00, 'Maybank - 514012349988', 0.00, 'Instant DuitNow transfer verified', DATE_SUB(NOW(), INTERVAL 1 DAY)),
     (4, 1, 'INV-KL-20261113-0004', 2, 4, 'Kamille Bidan', '+60 13-667 9900', 1425.00, 45.00, 1380.00, 'transfer', 0.00, 1380.00, 'Maybank - 514012349988', 0.00, 'VIP Collector bundle', DATE_SUB(NOW(), INTERVAL 3 DAY)),
     (5, 1, 'INV-KL-20261105-0005', 3, 5, 'Heero Yuy', '+60 18-221 7744', 518.00, 0.00, 518.00, 'cash', 520.00, 0.00, NULL, 2.00, 'Standard walk-in purchase', DATE_SUB(NOW(), INTERVAL 10 DAY)),
@@ -276,7 +276,7 @@ async function seed() {
     (1, 1, 'Amuro Ray (HQ Admin)', 'admin', 'System', 'INIT', 1, 'Initialized Gundam Base POS system and multi-branch master catalog', '{"branch":"BR-KL01"}', '127.0.0.1', DATE_SUB(NOW(), INTERVAL 3 DAY)),
     (1, 1, 'Amuro Ray (HQ Admin)', 'admin', 'Stock In', 'STOCK_IN', 2, 'Added +30 stock to HG 1/144 X-EX01 Gundam Calibarn (20 -> 50)', '{"productId":9,"qty":30,"prev":20,"next":50}', '127.0.0.1', DATE_SUB(NOW(), INTERVAL 2 DAY)),
     (1, 3, 'Kira Yamato (KL Senior Cashier)', 'employee', 'POS', 'PRICE_OVERRIDE', 3, 'Modified unit price in POS for RG 1/144 GF13-017NJII God Gundam from RM 165.00 to RM 200.00 on Invoice INV-KL-20261115-0003', '{"invoice":"INV-KL-20261115-0003","product":"RG 1/144 GF13-017NJII God Gundam","originalPrice":165,"customPrice":200}', '127.0.0.1', DATE_SUB(NOW(), INTERVAL 1 DAY)),
-    (1, 2, 'Suletta Mercury (KL Cashier)', 'employee', 'POS', 'POS_CHECKOUT', 2, 'Completed split payment transaction INV-KL-20261116-0002 for customer Miorine Rembran (Net: RM 670.00 | Cash: RM 200.00, Transfer: RM 470.00)', '{"invoice":"INV-KL-20261116-0002","netTotal":670,"paymentMethod":"split"}', '127.0.0.1', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
+    (1, 2, 'Suletta Mercury (KL Cashier)', 'employee', 'POS', 'POS_CHECKOUT', 2, 'Completed QR Pay transaction INV-KL-20261116-0002 for customer Miorine Rembran (Net: RM 670.00 | DuitNow QR)', '{"invoice":"INV-KL-20261116-0002","netTotal":670,"paymentMethod":"qr_pay"}', '127.0.0.1', DATE_SUB(NOW(), INTERVAL 2 HOUR)),
     (1, 1, 'Amuro Ray (HQ Admin)', 'admin', 'Products', 'SOFT_DELETE', 16, 'Soft-deleted product HG 1/144 Zaku II Red Comet [Discontinued Sample] (Code: 4573102999991)', '{"productId":16,"code":"4573102999991"}', '127.0.0.1', DATE_SUB(NOW(), INTERVAL 1 HOUR))
   `);
 

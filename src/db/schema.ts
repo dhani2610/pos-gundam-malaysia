@@ -297,7 +297,7 @@ export const transactions = mysqlTable(
       .notNull(),
     paymentMethod: varchar("payment_method", { length: 30 })
       .default("cash")
-      .notNull(), // 'cash' | 'transfer' | 'split'
+      .notNull(), // 'cash' | 'transfer' | 'qr_pay'
     cashAmount: decimal("cash_amount", { precision: 15, scale: 2 })
       .default("0.00")
       .notNull(),

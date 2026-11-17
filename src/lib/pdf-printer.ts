@@ -123,12 +123,12 @@ export function printReceiptInline(
         <div class="divider"></div>
         <div class="row"><span>Payment Method:</span><span class="bold">${String(tx.paymentMethod).replace("_", " ").toUpperCase()}</span></div>
         ${
-          tx.paymentMethod === "cash" || tx.paymentMethod === "split"
+          tx.paymentMethod === "cash"
             ? `<div class="row"><span>Cash Paid:</span><span>${formatRM(tx.cashAmount)}</span></div>`
             : ""
         }
         ${
-          tx.paymentMethod === "transfer" || tx.paymentMethod === "split"
+          tx.paymentMethod === "transfer"
             ? `<div class="row"><span>Bank Transfer:</span><span>${formatRM(tx.transferAmount)}</span></div>`
             : ""
         }
@@ -264,12 +264,12 @@ export function downloadReceiptPdf(
   doc.text(`Method: ${String(tx.paymentMethod).toUpperCase()}`, 5, y);
   y += 4;
 
-  if (tx.paymentMethod === "cash" || tx.paymentMethod === "split") {
+  if (tx.paymentMethod === "cash") {
     doc.text("Cash Paid:", 5, y);
     doc.text(formatRM(tx.cashAmount), 75, y, { align: "right" });
     y += 4;
   }
-  if (tx.paymentMethod === "transfer" || tx.paymentMethod === "split") {
+  if (tx.paymentMethod === "transfer") {
     doc.text("Transfer Paid:", 5, y);
     doc.text(formatRM(tx.transferAmount), 75, y, { align: "right" });
     y += 4;

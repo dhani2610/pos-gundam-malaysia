@@ -200,8 +200,7 @@ export function ReceiptModal({
 
           {/* Payment Breakdown */}
           <div className="rounded-lg bg-muted/50 p-3 space-y-1.5 text-xs border border-border/60">
-            {(transaction.paymentMethod === "cash" ||
-              transaction.paymentMethod === "split") && (
+            {transaction.paymentMethod === "cash" && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Cash Amount Paid</span>
                 <span className="font-mono font-semibold">
@@ -209,8 +208,7 @@ export function ReceiptModal({
                 </span>
               </div>
             )}
-            {(transaction.paymentMethod === "transfer" ||
-              transaction.paymentMethod === "split") && (
+            {transaction.paymentMethod === "transfer" && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
                   Bank Transfer Amount

@@ -124,7 +124,7 @@ export default function SettingsPage() {
         </h1>
         <p className="text-xs text-muted-foreground mt-0.5">
           Configure store branding, receipt letterhead (Kop), address, and bank
-          accounts for Transfer / Split POS payments
+          accounts for Transfer / QR Pay POS payments
         </p>
       </div>
 
@@ -221,7 +221,7 @@ export default function SettingsPage() {
                 Bank Payment Accounts
               </CardTitle>
               <CardDescription>
-                Displayed during Transfer and Split Payment checkout in POS
+                Displayed during Transfer and QR Pay checkout in POS
               </CardDescription>
             </div>
             <Button

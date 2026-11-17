@@ -161,7 +161,7 @@ export default function ReportsPage() {
         return (
           <Badge
             variant={
-              m === "cash" ? "success" : m === "split" ? "warning" : "info"
+              m === "cash" ? "success" : m === "qr_pay" ? "outline" : "info"
             }
             className="uppercase font-mono text-[10px]"
           >
@@ -172,33 +172,10 @@ export default function ReportsPage() {
     },
     {
       id: "paymentBreakdown",
-      header: "Payment Breakdown (Cash / Transfer)",
+      header: "Payment Breakdown",
       cell: ({ row }) => {
         const tx = row.original;
         const m = String(tx.paymentMethod || "cash").toLowerCase();
-        if (m === "split") {
-          return (
-            <div className="text-xs space-y-0.5 font-mono">
-              <div>
-                <span className="text-slate-500">Cash:</span>{" "}
-                <span className="font-bold text-emerald-700">
-                  {formatRM(tx.cashAmount)}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-500">Transfer:</span>{" "}
-                <span className="font-bold text-blue-700">
-                  {formatRM(tx.transferAmount)}
-                </span>
-              </div>
-              {tx.bankAccountInfo && (
-                <div className="text-[10px] font-sans text-slate-500">
-                  {tx.bankAccountInfo}
-                </div>
-              )}
-            </div>
-          );
-        }
         if (m === "qr_pay") {
           return (
             <div className="text-xs space-y-0.5 font-mono">
@@ -222,7 +199,7 @@ export default function ReportsPage() {
               <div>
                 <span className="text-slate-500">Transfer:</span>{" "}
                 <span className="font-bold text-blue-700">
-                  {formatRM(tx.transferAmount)}
+                  {formatRM(tx.transferAmount || tx.netTotal)}
                 </span>
               </div>
               {tx.bankAccountInfo && (
