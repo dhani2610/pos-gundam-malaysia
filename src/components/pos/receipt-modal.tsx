@@ -201,6 +201,16 @@ export function ReceiptModal({
                 -{formatRM(transaction.discountTotal)}
               </span>
             </div>
+            {Number(transaction.taxAmount || 0) > 0 && (
+              <div className="flex justify-between text-blue-950 font-semibold">
+                <span>
+                  Tax / SST ({Number(transaction.taxPercentage || 0)}%)
+                </span>
+                <span className="font-mono text-blue-700 font-bold">
+                  +{formatRM(transaction.taxAmount)}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between text-base font-extrabold pt-2 border-t border-border">
               <span>NET TOTAL</span>
               <span className="font-mono text-primary">

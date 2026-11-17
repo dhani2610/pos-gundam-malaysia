@@ -16,4 +16,7 @@ export interface WebsiteSettingsDto {
   bankAccountHolder?: string;
   secondaryBanks?: BankAccountItemDto[];
   receiptFooter?: string;
+  taxEnabled?: boolean | number;
+  taxPercentage?: number;
+  taxName?: string;
 }

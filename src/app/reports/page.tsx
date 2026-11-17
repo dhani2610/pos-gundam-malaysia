@@ -41,15 +41,19 @@ export default function ReportsPage() {
     cards: {
       dailyNet: 0,
       dailyGross: 0,
+      dailyTax: 0,
       dailyCount: 0,
       weeklyNet: 0,
       weeklyGross: 0,
+      weeklyTax: 0,
       weeklyCount: 0,
       monthlyNet: 0,
       monthlyGross: 0,
+      monthlyTax: 0,
       monthlyCount: 0,
       filteredGross: 0,
       filteredDiscount: 0,
+      filteredTax: 0,
       filteredNet: 0,
     },
     transactions: [],
@@ -241,19 +245,40 @@ export default function ReportsPage() {
         const tx = row.original;
         const itemDisc = Number(tx.itemDiscountTotal || 0);
         const ordDisc = Number(tx.orderDiscountAmount || 0);
+        const voucherDisc = Number(tx.voucherDiscountAmount || 0);
         const totalDisc = Number(tx.discountTotal || 0);
         return (
           <div className="font-mono text-xs">
             <div className="font-bold text-amber-600">
-              -{formatRM(totalDisc)}
+              {totalDisc > 0 ? `-${formatRM(totalDisc)}` : "-"}
             </div>
-            {(itemDisc > 0 || ordDisc > 0) && (
+            {(itemDisc > 0 || ordDisc > 0 || voucherDisc > 0) && (
               <div className="text-[10px] text-slate-500">
                 {itemDisc > 0 ? `Item: -${formatRM(itemDisc)}` : ""}
                 {itemDisc > 0 && ordDisc > 0 ? " | " : ""}
-                {ordDisc > 0 ? `Total Disc: -${formatRM(ordDisc)}` : ""}
+                {ordDisc > 0 ? `Order: -${formatRM(ordDisc)}` : ""}
+                {(itemDisc > 0 || ordDisc > 0) && voucherDisc > 0 ? " | " : ""}
+                {voucherDisc > 0 ? `Voucher [${tx.voucherCode}]: -${formatRM(voucherDisc)}` : ""}
               </div>
             )}
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "taxAmount",
+      header: "Tax / SST (RM)",
+      cell: ({ row }) => {
+        const tx = row.original;
+        const taxAmount = Number(tx.taxAmount || 0);
+        const taxPercentage = Number(tx.taxPercentage || 0);
+        if (taxAmount <= 0) {
+          return <span className="text-xs text-muted-foreground">-</span>;
+        }
+        return (
+          <div className="font-mono text-xs">
+            <span className="font-bold text-sky-700">+{formatRM(taxAmount)}</span>
+            <span className="text-[10px] text-slate-500 ml-1">({taxPercentage}%)</span>
           </div>
         );
       },
@@ -357,8 +382,7 @@ export default function ReportsPage() {
               {formatRM(c.filteredNet)}
             </div>
             <p className="text-[11px] text-slate-500 mt-1">
-              Gross: {formatRM(c.filteredGross)} • Disc: -
-              {formatRM(c.filteredDiscount)}
+              Gross: {formatRM(c.filteredGross)} • Disc: -{formatRM(c.filteredDiscount)} • Tax: +{formatRM(c.filteredTax)}
             </p>
           </CardContent>
         </Card>

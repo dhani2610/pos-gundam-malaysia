@@ -27,9 +27,11 @@ export class ReportService {
       `SELECT
          COALESCE(SUM(t.gross_total), 0) as grossRevenue,
          COALESCE(SUM(t.discount_total), 0) as totalDiscount,
+         COALESCE(SUM(t.tax_amount), 0) as totalTax,
          COALESCE(SUM(t.net_total), 0) as netRevenue,
          COUNT(t.id) as totalTransactions,
          COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN t.net_total ELSE 0 END), 0) as todayNetRevenue,
+         COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN t.tax_amount ELSE 0 END), 0) as todayTaxRevenue,
          COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN t.gross_total ELSE 0 END), 0) as todayGrossRevenue
        FROM transactions t
        WHERE t.deleted_at IS NULL AND (? = 0 OR t.id_cabang = ?) ${userFilterSql} ${dateFilterSql}`,
@@ -95,9 +97,11 @@ export class ReportService {
       overview: {
         grossRevenue: Number(totals[0]?.grossRevenue || 0),
         totalDiscount: Number(totals[0]?.totalDiscount || 0),
+        totalTax: Number(totals[0]?.totalTax || 0),
         netRevenue: Number(totals[0]?.netRevenue || 0),
         totalTransactions: Number(totals[0]?.totalTransactions || 0),
         todayNetRevenue: Number(totals[0]?.todayNetRevenue || 0),
+        todayTaxRevenue: Number(totals[0]?.todayTaxRevenue || 0),
         todayGrossRevenue: Number(totals[0]?.todayGrossRevenue || 0),
         totalProducts: Number(stockSummary[0]?.totalProducts || 0),
         totalUnitsInStock: Number(stockSummary[0]?.totalUnitsInStock || 0),
@@ -133,14 +137,17 @@ export class ReportService {
       `SELECT
          COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN t.net_total ELSE 0 END), 0) as dailyNet,
          COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN t.gross_total ELSE 0 END), 0) as dailyGross,
+         COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN t.tax_amount ELSE 0 END), 0) as dailyTax,
          SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN 1 ELSE 0 END) as dailyCount,
 
          COALESCE(SUM(CASE WHEN t.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN t.net_total ELSE 0 END), 0) as weeklyNet,
          COALESCE(SUM(CASE WHEN t.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN t.gross_total ELSE 0 END), 0) as weeklyGross,
+         COALESCE(SUM(CASE WHEN t.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN t.tax_amount ELSE 0 END), 0) as weeklyTax,
          SUM(CASE WHEN t.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as weeklyCount,
 
          COALESCE(SUM(CASE WHEN YEAR(t.created_at) = YEAR(CURDATE()) AND MONTH(t.created_at) = MONTH(CURDATE()) THEN t.net_total ELSE 0 END), 0) as monthlyNet,
          COALESCE(SUM(CASE WHEN YEAR(t.created_at) = YEAR(CURDATE()) AND MONTH(t.created_at) = MONTH(CURDATE()) THEN t.gross_total ELSE 0 END), 0) as monthlyGross,
+         COALESCE(SUM(CASE WHEN YEAR(t.created_at) = YEAR(CURDATE()) AND MONTH(t.created_at) = MONTH(CURDATE()) THEN t.tax_amount ELSE 0 END), 0) as monthlyTax,
          SUM(CASE WHEN YEAR(t.created_at) = YEAR(CURDATE()) AND MONTH(t.created_at) = MONTH(CURDATE()) THEN 1 ELSE 0 END) as monthlyCount
        FROM transactions t
        WHERE t.deleted_at IS NULL AND (? = 0 OR t.id_cabang = ?) ${userFilterSql}`,
@@ -155,6 +162,10 @@ export class ReportService {
              t.order_discount_type as orderDiscountType,
              t.order_discount_value as orderDiscountValue,
              t.order_discount_amount as orderDiscountAmount,
+             t.voucher_code as voucherCode,
+             t.voucher_discount_amount as voucherDiscountAmount,
+             t.tax_percentage as taxPercentage,
+             t.tax_amount as taxAmount,
              t.discount_total as discountTotal,
              t.net_total as netTotal,
              t.payment_method as paymentMethod, t.cash_amount as cashAmount, t.transfer_amount as transferAmount,
@@ -189,6 +200,10 @@ export class ReportService {
       (acc: number, r: any) => acc + Number(r.discountTotal || 0),
       0
     );
+    const filteredTax = transactions.reduce(
+      (acc: number, r: any) => acc + Number(r.taxAmount || 0),
+      0
+    );
     const filteredNet = transactions.reduce(
       (acc: number, r: any) => acc + Number(r.netTotal || 0),
       0
@@ -198,15 +213,19 @@ export class ReportService {
       cards: {
         dailyNet: Number(periodMetrics[0]?.dailyNet || 0),
         dailyGross: Number(periodMetrics[0]?.dailyGross || 0),
+        dailyTax: Number(periodMetrics[0]?.dailyTax || 0),
         dailyCount: Number(periodMetrics[0]?.dailyCount || 0),
         weeklyNet: Number(periodMetrics[0]?.weeklyNet || 0),
         weeklyGross: Number(periodMetrics[0]?.weeklyGross || 0),
+        weeklyTax: Number(periodMetrics[0]?.weeklyTax || 0),
         weeklyCount: Number(periodMetrics[0]?.weeklyCount || 0),
         monthlyNet: Number(periodMetrics[0]?.monthlyNet || 0),
         monthlyGross: Number(periodMetrics[0]?.monthlyGross || 0),
+        monthlyTax: Number(periodMetrics[0]?.monthlyTax || 0),
         monthlyCount: Number(periodMetrics[0]?.monthlyCount || 0),
         filteredGross,
         filteredDiscount,
+        filteredTax,
         filteredNet,
       },
       transactions,

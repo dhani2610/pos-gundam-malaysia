@@ -22,6 +22,8 @@ export class TransactionService {
              t.voucher_id as voucherId,
              t.voucher_code as voucherCode,
              t.voucher_discount_amount as voucherDiscountAmount,
+             t.tax_percentage as taxPercentage,
+             t.tax_amount as taxAmount,
              t.discount_total as discountTotal,
              t.net_total as netTotal,
              t.payment_method as paymentMethod, t.cash_amount as cashAmount, t.transfer_amount as transferAmount,
@@ -92,6 +94,8 @@ export class TransactionService {
              t.voucher_id as voucherId,
              t.voucher_code as voucherCode,
              t.voucher_discount_amount as voucherDiscountAmount,
+             t.tax_percentage as taxPercentage,
+             t.tax_amount as taxAmount,
              t.discount_total as discountTotal,
              t.net_total as netTotal,
              t.payment_method as paymentMethod, t.cash_amount as cashAmount, t.transfer_amount as transferAmount,
@@ -256,7 +260,22 @@ export class TransactionService {
       const discountTotal = Number(
         (itemDiscountTotal + voucherDiscountAmount + orderDiscountAmount).toFixed(2)
       );
-      const netTotal = Math.max(0, grossTotal - discountTotal);
+      const subtotalAfterTotalDiscount = Math.max(0, grossTotal - discountTotal);
+
+      // Tax (SST / Custom %)
+      const taxPercentage = Math.max(0, Number(dto.taxPercentage || 0));
+      let taxAmount = Math.max(0, Number(dto.taxAmount || 0));
+      if (taxPercentage > 0 && (!dto.taxAmount && dto.taxAmount !== 0)) {
+        taxAmount = Number(
+          ((subtotalAfterTotalDiscount * taxPercentage) / 100).toFixed(2)
+        );
+      } else {
+        taxAmount = Number(taxAmount.toFixed(2));
+      }
+
+      const netTotal = Number(
+        (subtotalAfterTotalDiscount + taxAmount).toFixed(2)
+      );
 
       let cashAmount = Number(dto.cashAmount || 0);
       let transferAmount = Number(dto.transferAmount || 0);
@@ -285,9 +304,9 @@ export class TransactionService {
         `INSERT INTO transactions
          (id_cabang, invoice_no, user_id, customer_id, customer_name, customer_phone,
           gross_total, item_discount_total, order_discount_type, order_discount_value, order_discount_amount,
-          voucher_id, voucher_code, voucher_discount_amount, discount_total, net_total,
+          voucher_id, voucher_code, voucher_discount_amount, tax_percentage, tax_amount, discount_total, net_total,
           payment_method, cash_amount, transfer_amount, bank_account_info, change_amount, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           dto.idCabang,
           invoiceNo,
@@ -303,6 +322,8 @@ export class TransactionService {
           voucherId,
           voucherCode,
           voucherDiscountAmount,
+          taxPercentage,
+          taxAmount,
           discountTotal,
           netTotal,
           dto.paymentMethod,
@@ -528,7 +549,22 @@ export class TransactionService {
       const discountTotal = Number(
         (itemDiscountTotal + voucherDiscountAmount + orderDiscountAmount).toFixed(2)
       );
-      const netTotal = Math.max(0, grossTotal - discountTotal);
+      const subtotalAfterTotalDiscount = Math.max(0, grossTotal - discountTotal);
+
+      // Tax (SST / Custom %)
+      const taxPercentage = Math.max(0, Number(dto.taxPercentage || 0));
+      let taxAmount = Math.max(0, Number(dto.taxAmount || 0));
+      if (taxPercentage > 0 && (!dto.taxAmount && dto.taxAmount !== 0)) {
+        taxAmount = Number(
+          ((subtotalAfterTotalDiscount * taxPercentage) / 100).toFixed(2)
+        );
+      } else {
+        taxAmount = Number(taxAmount.toFixed(2));
+      }
+
+      const netTotal = Number(
+        (subtotalAfterTotalDiscount + taxAmount).toFixed(2)
+      );
 
       let cashAmount = Number(dto.cashAmount || 0);
       let transferAmount = Number(dto.transferAmount || 0);
@@ -552,6 +588,7 @@ export class TransactionService {
          SET customer_id = ?, customer_name = ?, customer_phone = ?,
              gross_total = ?, item_discount_total = ?, order_discount_type = ?, order_discount_value = ?, order_discount_amount = ?,
              voucher_id = ?, voucher_code = ?, voucher_discount_amount = ?,
+             tax_percentage = ?, tax_amount = ?,
              discount_total = ?, net_total = ?,
              payment_method = ?, cash_amount = ?, transfer_amount = ?, bank_account_info = ?, change_amount = ?, notes = ?,
              updated_at = NOW()
@@ -568,6 +605,8 @@ export class TransactionService {
           voucherId,
           voucherCode,
           voucherDiscountAmount,
+          taxPercentage,
+          taxAmount,
           discountTotal,
           netTotal,
           dto.paymentMethod,

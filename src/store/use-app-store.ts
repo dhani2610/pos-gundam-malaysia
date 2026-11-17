@@ -29,6 +29,9 @@ export interface WebsiteSettingsData {
     accountHolder: string;
   }>;
   receiptFooter?: string;
+  taxEnabled?: boolean | number;
+  taxPercentage?: number;
+  taxName?: string;
 }
 
 interface AppState {

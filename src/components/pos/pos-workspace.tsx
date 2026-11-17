@@ -130,6 +130,7 @@ export function PosWorkspace({
   const [quickCustomerOpen, setQuickCustomerOpen] = useState(false);
   const [completedTx, setCompletedTx] = useState<any | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [currentSettings, setCurrentSettings] = useState<any>(null);
 
   const barcodeRef = useRef<HTMLInputElement>(null);
 
@@ -147,10 +148,13 @@ export function PosWorkspace({
         setAvailableVouchers(json.data.vouchers || []);
 
         const st = json.data.settings;
-        if (st?.bankName) {
-          setSelectedBank(
-            `${st.bankName} - ${st.bankAccountNumber} (${st.bankAccountHolder})`
-          );
+        if (st) {
+          setCurrentSettings(st);
+          if (st.bankName) {
+            setSelectedBank(
+              `${st.bankName} - ${st.bankAccountNumber} (${st.bankAccountHolder})`
+            );
+          }
         }
       }
     } catch {
@@ -448,9 +452,37 @@ export function PosWorkspace({
     const discountTotal = Number(
       (itemDiscountTotal + voucherDiscountAmount + orderDiscountAmount).toFixed(2)
     );
-    const netTotal = Math.max(
+
+    const subtotalAfterTotalDiscount = Math.max(
       0,
       Number((grossTotal - discountTotal).toFixed(2))
+    );
+
+    // Tax Settings & Calculation
+    const isTaxEnabled = editingTransaction
+      ? Number(editingTransaction.taxAmount || 0) > 0 ||
+        Number(editingTransaction.taxPercentage || 0) > 0
+      : Boolean(currentSettings?.taxEnabled ?? settings?.taxEnabled);
+
+    const taxPercentage = isTaxEnabled
+      ? Number(
+          editingTransaction?.taxPercentage ??
+            currentSettings?.taxPercentage ??
+            settings?.taxPercentage ??
+            0
+        )
+      : 0;
+
+    const taxName = currentSettings?.taxName || settings?.taxName || "SST";
+
+    const taxAmount =
+      isTaxEnabled && taxPercentage > 0
+        ? Number(((subtotalAfterTotalDiscount * taxPercentage) / 100).toFixed(2))
+        : 0;
+
+    const netTotal = Math.max(
+      0,
+      Number((subtotalAfterTotalDiscount + taxAmount).toFixed(2))
     );
 
     // Calculate sen remainder on net before order discount (e.g., RM 20.60 -> 0.60 sen)
@@ -467,10 +499,23 @@ export function PosWorkspace({
       orderDiscountValue: rawOrdVal,
       orderDiscountAmount,
       discountTotal,
+      subtotalAfterTotalDiscount,
+      isTaxEnabled,
+      taxPercentage,
+      taxName,
+      taxAmount,
       netTotal,
       senRemainder,
     };
-  }, [cart, orderDiscountType, orderDiscountInput, appliedVoucher]);
+  }, [
+    cart,
+    orderDiscountType,
+    orderDiscountInput,
+    appliedVoucher,
+    currentSettings,
+    settings,
+    editingTransaction,
+  ]);
 
   const handleApplyVoucher = async (codeToUse?: string) => {
     const code = (codeToUse || voucherCodeInput).trim().toUpperCase();
@@ -583,6 +628,8 @@ export function PosWorkspace({
         voucherId: appliedVoucher?.id || null,
         voucherCode: appliedVoucher?.code || null,
         voucherDiscountAmount: totals.voucherDiscountAmount,
+        taxPercentage: totals.taxPercentage,
+        taxAmount: totals.taxAmount,
         orderDiscountType,
         orderDiscountValue: totals.orderDiscountValue,
         orderDiscountAmount: totals.orderDiscountAmount,
@@ -1383,6 +1430,17 @@ export function PosWorkspace({
                   -{formatRM(totals.discountTotal)}
                 </span>
               </div>
+
+              {totals.taxAmount > 0 && (
+                <div className="flex justify-between text-blue-950 font-semibold pt-1 border-t border-blue-100">
+                  <span>
+                    Tax / {totals.taxName} ({totals.taxPercentage}%)
+                  </span>
+                  <span className="font-mono text-blue-700 font-bold">
+                    +{formatRM(totals.taxAmount)}
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between text-base font-extrabold pt-2 border-t border-blue-200">
                 <span className="text-blue-950">NET PAYABLE</span>

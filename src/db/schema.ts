@@ -338,6 +338,12 @@ export const transactions = mysqlTable(
     })
       .default("0.00")
       .notNull(),
+    taxPercentage: decimal("tax_percentage", { precision: 5, scale: 2 })
+      .default("0.00")
+      .notNull(),
+    taxAmount: decimal("tax_amount", { precision: 15, scale: 2 })
+      .default("0.00")
+      .notNull(),
     discountTotal: decimal("discount_total", { precision: 15, scale: 2 })
       .default("0.00")
       .notNull(),
@@ -439,6 +445,11 @@ export const websiteSettings = mysqlTable(
     bankAccountHolder: varchar("bank_account_holder", { length: 150 }),
     secondaryBanks: text("secondary_banks"),
     receiptFooter: text("receipt_footer"),
+    taxEnabled: int("tax_enabled").default(0).notNull(),
+    taxPercentage: decimal("tax_percentage", { precision: 5, scale: 2 })
+      .default("0.00")
+      .notNull(),
+    taxName: varchar("tax_name", { length: 50 }).default("SST").notNull(),
     updatedAt: datetime("updated_at")
       .default(sql`CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`)
       .notNull(),

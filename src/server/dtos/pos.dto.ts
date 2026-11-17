@@ -21,6 +21,8 @@ export interface CreateTransactionDto {
   voucherId?: number | null;
   voucherCode?: string | null;
   voucherDiscountAmount?: number;
+  taxPercentage?: number;
+  taxAmount?: number;
   paymentMethod: "cash" | "transfer" | "qr_pay";
   cashAmount: number;
   transferAmount: number;

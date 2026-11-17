@@ -122,6 +122,11 @@ export function printReceiptInline(
             : ""
         }
         <div class="row"><span>Total Discount:</span><span>-${formatRM(tx.discountTotal)}</span></div>
+        ${
+          Number(tx.taxAmount || 0) > 0
+            ? `<div class="row"><span>Tax / SST (${Number(tx.taxPercentage || 0)}%):</span><span>+${formatRM(tx.taxAmount)}</span></div>`
+            : ""
+        }
         <div class="row bold" style="font-size: 14px; margin-top: 4px;">
           <span>NET TOTAL:</span><span>${formatRM(tx.netTotal)}</span>
         </div>
@@ -266,7 +271,14 @@ export function downloadReceiptPdf(
 
   doc.text("Total Discount:", 5, y);
   doc.text(`-${formatRM(tx.discountTotal)}`, 75, y, { align: "right" });
-  y += 4.5;
+  y += 4;
+
+  if (Number(tx.taxAmount || 0) > 0) {
+    doc.text(`Tax / SST (${Number(tx.taxPercentage || 0)}%):`, 5, y);
+    doc.text(`+${formatRM(tx.taxAmount)}`, 75, y, { align: "right" });
+    y += 4;
+  }
+  y += 0.5;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9.5);
@@ -382,8 +394,9 @@ export function exportSalesReportPdf(params: {
     ["Daily Revenue (Today)", formatRM(cards.dailyNet)],
     ["Weekly Revenue (7 Days)", formatRM(cards.weeklyNet)],
     ["Monthly Revenue", formatRM(cards.monthlyNet)],
-    ["Filtered Gross Revenue", formatRM(cards.filteredGross)],
+    ["Filtered Gross", formatRM(cards.filteredGross)],
     ["Filtered Discounts", formatRM(cards.filteredDiscount)],
+    ["Filtered Tax (SST)", formatRM(cards.filteredTax || 0)],
     ["Filtered Net Revenue", formatRM(cards.filteredNet)],
   ];
 
@@ -419,6 +432,12 @@ export function exportSalesReportPdf(params: {
     if (parts.length > 0) {
       discDetail = `-${formatRM(totalDisc)} (${parts.join(" | ")})`;
     }
+    const taxAmt = Number(tx.taxAmount || 0);
+    const taxDetail =
+      taxAmt > 0
+        ? `+${formatRM(taxAmt)} (${Number(tx.taxPercentage || 0)}%)`
+        : "-";
+
     return [
       idx + 1,
       tx.invoiceNo,
@@ -429,6 +448,7 @@ export function exportSalesReportPdf(params: {
       formatPaymentBreakdownText(tx),
       formatRM(tx.grossTotal),
       discDetail,
+      taxDetail,
       formatRM(tx.netTotal),
     ];
   });
@@ -446,6 +466,7 @@ export function exportSalesReportPdf(params: {
         "Payment Breakdown (Cash / Transfer Details)",
         "Gross (RM)",
         "Discount (RM)",
+        "Tax / SST (RM)",
         "Net Total (RM)",
       ],
     ],
@@ -460,7 +481,8 @@ export function exportSalesReportPdf(params: {
         "",
         "TOTAL REVENUE",
         formatRM(cards.filteredGross),
-        formatRM(cards.filteredDiscount),
+        `-${formatRM(cards.filteredDiscount)}`,
+        `+${formatRM(cards.filteredTax || 0)}`,
         formatRM(cards.filteredNet),
       ],
     ],

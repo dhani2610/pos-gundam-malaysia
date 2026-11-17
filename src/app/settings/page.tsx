@@ -22,6 +22,10 @@ import {
   Trash2,
   Save,
   Building2,
+  Percent,
+  Receipt,
+  BadgePercent,
+  CheckCircle2,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -41,6 +45,9 @@ export default function SettingsPage() {
     Array<{ bankName: string; accountNumber: string; accountHolder: string }>
   >([]);
   const [receiptFooter, setReceiptFooter] = useState("");
+  const [taxEnabled, setTaxEnabled] = useState(false);
+  const [taxPercentage, setTaxPercentage] = useState("6.00");
+  const [taxName, setTaxName] = useState("SST");
 
   useEffect(() => {
     fetch(`/api/settings?idCabang=${activeBranchId}`)
@@ -60,6 +67,13 @@ export default function SettingsPage() {
             Array.isArray(d.secondaryBanks) ? d.secondaryBanks : []
           );
           setReceiptFooter(d.receiptFooter || "");
+          setTaxEnabled(Boolean(d.taxEnabled));
+          setTaxPercentage(
+            d.taxPercentage !== undefined && d.taxPercentage !== null
+              ? String(d.taxPercentage)
+              : "6.00"
+          );
+          setTaxName(d.taxName || "SST");
         }
       });
   }, [activeBranchId]);
@@ -102,6 +116,9 @@ export default function SettingsPage() {
           bankAccountHolder,
           secondaryBanks,
           receiptFooter,
+          taxEnabled,
+          taxPercentage: parseFloat(taxPercentage) || 0,
+          taxName,
         }),
       });
       const json = await res.json();
@@ -209,6 +226,98 @@ export default function SettingsPage() {
                 placeholder="Thank you for shopping at Gundam Base!"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Tax & SST (Sales & Service Tax) Settings */}
+        <Card className="border-blue-200 bg-gradient-to-br from-white to-blue-50/30">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-base flex items-center gap-2 text-blue-950">
+                  <BadgePercent className="h-4 w-4 text-primary" />
+                  Tax & SST (Sales & Service Tax) Settings
+                </CardTitle>
+                <CardDescription>
+                  Configure automated tax percentage on checkout. When enabled, tax is automatically calculated, shown in POS cart, printed on receipts, and tracked in sales reports.
+                </CardDescription>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700">
+                  {taxEnabled ? "TAX ACTIVE" : "TAX OFF"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTaxEnabled(!taxEnabled)}
+                  className={`h-8 px-4 rounded-lg text-xs font-extrabold transition-all shadow-xs ${
+                    taxEnabled
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      : "bg-slate-200 hover:bg-slate-300 text-slate-700"
+                  }`}
+                >
+                  {taxEnabled ? "Enabled (ON)" : "Disabled (OFF)"}
+                </button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-800">
+                  Tax / SST Rate (% Percentage) *
+                </Label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    max="100"
+                    placeholder="e.g. 6.00 or 8.00"
+                    value={taxPercentage}
+                    onChange={(e) => setTaxPercentage(e.target.value)}
+                    className="h-9 font-mono font-bold text-xs pr-8"
+                    disabled={!taxEnabled}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                    %
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Standard Malaysia SST is typically 6% or 8%.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-slate-800">
+                  Tax Label / Name on Receipts *
+                </Label>
+                <Input
+                  placeholder="e.g. SST or Sales Tax"
+                  value={taxName}
+                  onChange={(e) => setTaxName(e.target.value)}
+                  className="h-9 text-xs"
+                  disabled={!taxEnabled}
+                />
+                <p className="text-[11px] text-slate-500">
+                  Label printed on thermal receipts (e.g. "SST (6%)").
+                </p>
+              </div>
+            </div>
+
+            {taxEnabled && (
+              <div className="p-3 rounded-lg bg-emerald-50/80 border border-emerald-200 text-xs flex items-center justify-between text-emerald-900">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>
+                    <strong>{taxName || "Tax"} ({taxPercentage || "0"}%)</strong> will be applied automatically to all POS cart checkouts for this store.
+                  </span>
+                </div>
+                <span className="font-mono font-bold text-[11px] bg-white px-2 py-0.5 rounded border border-emerald-300">
+                  Sample: RM 100.00 → +RM {((100 * (parseFloat(taxPercentage) || 0)) / 100).toFixed(2)} Tax
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
 

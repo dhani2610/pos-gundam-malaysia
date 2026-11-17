@@ -9,7 +9,8 @@ export class SettingsService {
       `SELECT id, id_cabang as idCabang, site_name as siteName, logo_url as logoUrl,
               address, phone, email, bank_name as bankName,
               bank_account_number as bankAccountNumber, bank_account_holder as bankAccountHolder,
-              secondary_banks as secondaryBanks, receipt_footer as receiptFooter
+              secondary_banks as secondaryBanks, receipt_footer as receiptFooter,
+              tax_enabled as taxEnabled, tax_percentage as taxPercentage, tax_name as taxName
        FROM website_settings
        WHERE id_cabang = ? AND deleted_at IS NULL
        LIMIT 1`,
@@ -22,7 +23,8 @@ export class SettingsService {
         `SELECT id, id_cabang as idCabang, site_name as siteName, logo_url as logoUrl,
                 address, phone, email, bank_name as bankName,
                 bank_account_number as bankAccountNumber, bank_account_holder as bankAccountHolder,
-                secondary_banks as secondaryBanks, receipt_footer as receiptFooter
+                secondary_banks as secondaryBanks, receipt_footer as receiptFooter,
+                tax_enabled as taxEnabled, tax_percentage as taxPercentage, tax_name as taxName
          FROM website_settings
          WHERE deleted_at IS NULL
          ORDER BY id ASC LIMIT 1`
@@ -46,6 +48,9 @@ export class SettingsService {
     return {
       ...row,
       secondaryBanks,
+      taxEnabled: Boolean(row.taxEnabled),
+      taxPercentage: Number(row.taxPercentage || 0),
+      taxName: row.taxName || "SST",
     };
   }
 
@@ -56,13 +61,17 @@ export class SettingsService {
     );
 
     const secondaryBanksStr = JSON.stringify(dto.secondaryBanks || []);
+    const taxEnabledVal = dto.taxEnabled === true || dto.taxEnabled === 1 ? 1 : 0;
+    const taxPercentageVal = Math.max(0, Number(dto.taxPercentage || 0));
+    const taxNameVal = dto.taxName?.trim() || "SST";
 
     if (existing[0]) {
       await pool.query(
         `UPDATE website_settings
          SET site_name = ?, logo_url = ?, address = ?, phone = ?, email = ?,
              bank_name = ?, bank_account_number = ?, bank_account_holder = ?,
-             secondary_banks = ?, receipt_footer = ?, updated_at = NOW()
+             secondary_banks = ?, receipt_footer = ?,
+             tax_enabled = ?, tax_percentage = ?, tax_name = ?, updated_at = NOW()
          WHERE id = ?`,
         [
           dto.siteName.trim(),
@@ -75,14 +84,17 @@ export class SettingsService {
           dto.bankAccountHolder || "",
           secondaryBanksStr,
           dto.receiptFooter || "",
+          taxEnabledVal,
+          taxPercentageVal,
+          taxNameVal,
           existing[0].id,
         ]
       );
     } else {
       await pool.query(
         `INSERT INTO website_settings
-         (id_cabang, site_name, logo_url, address, phone, email, bank_name, bank_account_number, bank_account_holder, secondary_banks, receipt_footer)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id_cabang, site_name, logo_url, address, phone, email, bank_name, bank_account_number, bank_account_holder, secondary_banks, receipt_footer, tax_enabled, tax_percentage, tax_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           dto.idCabang,
           dto.siteName.trim(),
@@ -95,6 +107,9 @@ export class SettingsService {
           dto.bankAccountHolder || "",
           secondaryBanksStr,
           dto.receiptFooter || "",
+          taxEnabledVal,
+          taxPercentageVal,
+          taxNameVal,
         ]
       );
     }
