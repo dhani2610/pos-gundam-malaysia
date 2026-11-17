@@ -2,6 +2,10 @@ import { NextRequest } from "next/server";
 import { VoucherController } from "@/server/controllers/voucher.controller";
 
 export async function GET(req: NextRequest) {
+  const historyId = req.nextUrl.searchParams.get("historyId");
+  if (historyId) {
+    return VoucherController.getVoucherHistory(req, Number(historyId));
+  }
   return VoucherController.getVouchers(req);
 }
 

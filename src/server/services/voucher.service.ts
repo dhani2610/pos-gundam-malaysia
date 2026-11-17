@@ -36,6 +36,9 @@ export class VoucherService {
         discountValue: Number(v.discount_value),
         minSpend: Number(v.min_spend),
         maxDiscount: Number(v.max_discount),
+        usageLimit: Number(v.usage_limit),
+        usageCount: Number(v.usage_count),
+        oncePerCustomer: Number(v.once_per_customer || 0),
       };
     });
   }
@@ -81,8 +84,8 @@ export class VoucherService {
 
     const [res]: any = await pool.query(
       `INSERT INTO vouchers
-       (id_cabang, code, name, discount_type, discount_value, min_spend, max_discount, usage_limit, start_date, end_date, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id_cabang, code, name, discount_type, discount_value, min_spend, max_discount, usage_limit, once_per_customer, start_date, end_date, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dto.idCabang ?? 0,
         code,
@@ -92,6 +95,7 @@ export class VoucherService {
         Number(dto.minSpend || 0),
         Number(dto.maxDiscount || 0),
         Number(dto.usageLimit || 0),
+        dto.oncePerCustomer === true || dto.oncePerCustomer === 1 ? 1 : 0,
         dto.startDate,
         dto.endDate,
         dto.isActive === false || dto.isActive === 0 ? 0 : 1,
@@ -143,7 +147,7 @@ export class VoucherService {
     await pool.query(
       `UPDATE vouchers
        SET id_cabang = ?, code = ?, name = ?, discount_type = ?, discount_value = ?,
-           min_spend = ?, max_discount = ?, usage_limit = ?, start_date = ?, end_date = ?, is_active = ?, updated_at = NOW()
+           min_spend = ?, max_discount = ?, usage_limit = ?, once_per_customer = ?, start_date = ?, end_date = ?, is_active = ?, updated_at = NOW()
        WHERE id = ? AND deleted_at IS NULL`,
       [
         dto.idCabang ?? 0,
@@ -154,6 +158,7 @@ export class VoucherService {
         Number(dto.minSpend || 0),
         Number(dto.maxDiscount || 0),
         Number(dto.usageLimit || 0),
+        dto.oncePerCustomer === true || dto.oncePerCustomer === 1 ? 1 : 0,
         dto.startDate,
         dto.endDate,
         dto.isActive === false || dto.isActive === 0 ? 0 : 1,
@@ -197,7 +202,9 @@ export class VoucherService {
   static async validateAndCalculateVoucher(
     code: string,
     idCabang: number,
-    subtotal: number
+    subtotal: number,
+    customerId?: number | string | null,
+    customerPhone?: string | null
   ) {
     const cleanCode = code.trim().toUpperCase();
     if (!cleanCode) throw new Error("Please enter a voucher code");
@@ -237,6 +244,31 @@ export class VoucherService {
       throw new Error(`Voucher "${cleanCode}" has reached its maximum usage limit (${v.usage_limit} uses)`);
     }
 
+    // Check once per customer flag
+    if (Number(v.once_per_customer || 0) === 1) {
+      const cId =
+        customerId && String(customerId) !== "walk-in" && !isNaN(Number(customerId))
+          ? Number(customerId)
+          : null;
+      const cPhone = customerPhone?.trim() || "";
+
+      if (cId || cPhone) {
+        const [prior]: any = await pool.query(
+          `SELECT id, invoice_no, customer_name, customer_phone, created_at FROM transactions
+           WHERE voucher_id = ?
+             AND ((? IS NOT NULL AND customer_id = ?) OR (? != '' AND customer_phone = ?))
+             AND deleted_at IS NULL
+           LIMIT 1`,
+          [v.id, cId, cId, cPhone, cPhone]
+        );
+        if (prior.length > 0) {
+          throw new Error(
+            `Customer "${prior[0].customer_name || 'Selected'}" has already used voucher "${cleanCode}" (Invoice: ${prior[0].invoice_no}). This voucher is limited to 1 use per customer.`
+          );
+        }
+      }
+    }
+
     const minSpend = Number(v.min_spend || 0);
     if (minSpend > 0 && subtotal < minSpend) {
       throw new Error(
@@ -271,9 +303,90 @@ export class VoucherService {
         discountAmount,
         minSpend,
         maxDiscount: Number(v.max_discount || 0),
+        usageLimit: Number(v.usage_limit || 0),
+        oncePerCustomer: Number(v.once_per_customer || 0),
         startDate: startDateStr,
         endDate: endDateStr,
       },
+    };
+  }
+
+  static async getVoucherUsageHistory(id: number) {
+    const [vRows]: any = await pool.query(
+      `SELECT v.*, b.name as branchName
+       FROM vouchers v
+       LEFT JOIN branches b ON v.id_cabang = b.id
+       WHERE v.id = ? AND v.deleted_at IS NULL`,
+      [id]
+    );
+    const voucher = vRows[0];
+    if (!voucher) throw new Error("Voucher not found");
+
+    const [txRows]: any = await pool.query(
+      `SELECT t.id, t.id_cabang, t.invoice_no, t.customer_id, t.customer_name, t.customer_phone,
+              t.gross_total, t.voucher_discount_amount, t.order_discount_amount, t.discount_total,
+              t.net_total, t.payment_method, t.created_at,
+              u.name as cashier_name, u.username as cashier_username,
+              b.name as branch_name
+       FROM transactions t
+       LEFT JOIN users u ON t.user_id = u.id
+       LEFT JOIN branches b ON t.id_cabang = b.id
+       WHERE t.voucher_id = ? AND t.deleted_at IS NULL
+       ORDER BY t.created_at DESC`,
+      [id]
+    );
+
+    let totalDiscountGiven = 0;
+    let totalGrossRevenue = 0;
+    let totalNetRevenue = 0;
+    const customerSet = new Set<string>();
+
+    for (const tx of txRows) {
+      totalDiscountGiven += Number(tx.voucher_discount_amount || 0);
+      totalGrossRevenue += Number(tx.gross_total || 0);
+      totalNetRevenue += Number(tx.net_total || 0);
+      const custKey = tx.customer_id
+        ? `ID:${tx.customer_id}`
+        : tx.customer_phone
+          ? `PHONE:${tx.customer_phone}`
+          : `NAME:${tx.customer_name}`;
+      if (custKey) customerSet.add(custKey);
+    }
+
+    return {
+      voucher: {
+        ...voucher,
+        discountValue: Number(voucher.discount_value),
+        minSpend: Number(voucher.min_spend),
+        maxDiscount: Number(voucher.max_discount),
+        usageLimit: Number(voucher.usage_limit),
+        usageCount: Number(voucher.usage_count),
+        oncePerCustomer: Number(voucher.once_per_customer || 0),
+      },
+      summary: {
+        totalRedemptions: txRows.length,
+        totalDiscountGiven: Number(totalDiscountGiven.toFixed(2)),
+        totalGrossRevenue: Number(totalGrossRevenue.toFixed(2)),
+        totalNetRevenue: Number(totalNetRevenue.toFixed(2)),
+        uniqueCustomersCount: customerSet.size,
+      },
+      redemptions: txRows.map((tx: any) => ({
+        id: tx.id,
+        invoiceNo: tx.invoice_no,
+        idCabang: tx.id_cabang,
+        branchName: tx.branch_name || `Branch #${tx.id_cabang}`,
+        customerId: tx.customer_id,
+        customerName: tx.customer_name || "Walk-in Customer",
+        customerPhone: tx.customer_phone || "",
+        cashierName: tx.cashier_name || tx.cashier_username || "Cashier",
+        grossTotal: Number(tx.gross_total || 0),
+        voucherDiscountAmount: Number(tx.voucher_discount_amount || 0),
+        orderDiscountAmount: Number(tx.order_discount_amount || 0),
+        discountTotal: Number(tx.discount_total || 0),
+        netTotal: Number(tx.net_total || 0),
+        paymentMethod: tx.payment_method,
+        createdAt: tx.created_at,
+      })),
     };
   }
 }

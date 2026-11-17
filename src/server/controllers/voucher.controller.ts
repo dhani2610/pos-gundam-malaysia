@@ -97,9 +97,30 @@ export class VoucherController {
       const result = await VoucherService.validateAndCalculateVoucher(
         body.code,
         Number(body.idCabang || 0),
-        Number(body.subtotal || 0)
+        Number(body.subtotal || 0),
+        body.customerId,
+        body.customerPhone
       );
       return NextResponse.json({ success: true, data: result.voucher });
+    } catch (err: any) {
+      return NextResponse.json(
+        { success: false, message: err.message },
+        { status: 400 }
+      );
+    }
+  }
+
+  static async getVoucherHistory(req: NextRequest, voucherId: number) {
+    try {
+      const actor = await getSessionUser(req);
+      if (!actor) {
+        return NextResponse.json(
+          { success: false, message: "Unauthorized" },
+          { status: 401 }
+        );
+      }
+      const data = await VoucherService.getVoucherUsageHistory(voucherId);
+      return NextResponse.json({ success: true, data });
     } catch (err: any) {
       return NextResponse.json(
         { success: false, message: err.message },

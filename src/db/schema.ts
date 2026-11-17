@@ -275,6 +275,7 @@ export const vouchers = mysqlTable(
       .notNull(),
     usageLimit: int("usage_limit").default(0).notNull(), // 0 = unlimited
     usageCount: int("usage_count").default(0).notNull(),
+    oncePerCustomer: int("once_per_customer").default(0).notNull(), // 1 = only 1 use per customer
     startDate: date("start_date", { mode: "string" }).notNull(),
     endDate: date("end_date", { mode: "string" }).notNull(),
     isActive: int("is_active").default(1).notNull(),

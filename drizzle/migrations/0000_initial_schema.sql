@@ -162,6 +162,7 @@ CREATE TABLE IF NOT EXISTS `vouchers` (
   `max_discount` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `usage_limit` INT NOT NULL DEFAULT 0,
   `usage_count` INT NOT NULL DEFAULT 0,
+  `once_per_customer` TINYINT(1) NOT NULL DEFAULT 0,
   `start_date` DATE NOT NULL,
   `end_date` DATE NOT NULL,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,

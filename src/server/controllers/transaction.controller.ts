@@ -12,6 +12,12 @@ export class TransactionController {
           { status: 401 }
         );
       }
+      const singleId = req.nextUrl.searchParams.get("id");
+      if (singleId) {
+        const data = await TransactionService.getTransactionById(Number(singleId));
+        return NextResponse.json({ success: true, data });
+      }
+
       const idCabang = Number(req.nextUrl.searchParams.get("idCabang") || 0);
       const startDate = req.nextUrl.searchParams.get("startDate") || undefined;
       const endDate = req.nextUrl.searchParams.get("endDate") || undefined;

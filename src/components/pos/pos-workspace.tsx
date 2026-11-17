@@ -483,6 +483,10 @@ export function PosWorkspace({
       return;
     }
 
+    const selectedCust = customers.find(
+      (c) => String(c.id) === selectedCustomerId
+    );
+
     setValidatingVoucher(true);
     try {
       const res = await fetch("/api/vouchers/validate", {
@@ -492,6 +496,8 @@ export function PosWorkspace({
           code,
           idCabang: effectiveBranchId,
           subtotal: totals.subtotalAfterItemDisc,
+          customerId: selectedCust ? selectedCust.id : null,
+          customerPhone: selectedCust ? selectedCust.phone : "",
         }),
       });
       const json = await res.json();
@@ -505,6 +511,9 @@ export function PosWorkspace({
       );
     } catch (err: any) {
       toast.error(err.message || "Invalid voucher code");
+      if (appliedVoucher?.code === code) {
+        setAppliedVoucher(null);
+      }
     } finally {
       setValidatingVoucher(false);
     }
@@ -1654,6 +1663,16 @@ export function PosWorkspace({
                         )}
                         {v.discountType === "percent" && Number(v.maxDiscount) > 0 && (
                           <span>Max Disc: {formatRM(Number(v.maxDiscount))}</span>
+                        )}
+                        {v.oncePerCustomer === 1 && (
+                          <Badge variant="outline" className="text-[9px] py-0 px-1 border-purple-300 text-purple-700 bg-purple-50">
+                            1x per Customer
+                          </Badge>
+                        )}
+                        {v.usageLimit === 0 ? (
+                          <span className="text-slate-500">Quota: Unlimited</span>
+                        ) : (
+                          <span>Quota: {v.usageCount || 0} / {v.usageLimit}</span>
                         )}
                         {(v.startDate || v.endDate) && (
                           <span className="flex items-center gap-1">

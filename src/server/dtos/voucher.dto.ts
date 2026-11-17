@@ -8,6 +8,7 @@ export interface CreateVoucherDto {
   minSpend?: number;
   maxDiscount?: number;
   usageLimit?: number;
+  oncePerCustomer?: number | boolean;
   startDate: string;
   endDate: string;
   isActive?: number | boolean;
@@ -17,4 +18,6 @@ export interface ValidateVoucherDto {
   code: string;
   idCabang: number;
   subtotal: number;
+  customerId?: number | string | null;
+  customerPhone?: string | null;
 }

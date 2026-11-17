@@ -188,13 +188,47 @@ export class TransactionService {
         Number(dto.voucherDiscountAmount || 0)
       );
 
-      if (voucherCode && !voucherId) {
+      if (voucherId || voucherCode) {
         const [vRows]: any = await conn.query(
-          `SELECT id, usage_limit, usage_count FROM vouchers WHERE UPPER(code) = ? AND deleted_at IS NULL`,
-          [voucherCode]
+          `SELECT id, code, usage_limit, usage_count, once_per_customer FROM vouchers WHERE (id = ? OR UPPER(code) = ?) AND deleted_at IS NULL`,
+          [voucherId || 0, voucherCode || ""]
         );
-        if (vRows[0]) {
-          voucherId = vRows[0].id;
+        const vRec = vRows[0];
+        if (vRec) {
+          voucherId = vRec.id;
+          voucherCode = vRec.code;
+
+          // Check usage limit
+          if (vRec.usage_limit > 0 && vRec.usage_count >= vRec.usage_limit) {
+            throw new Error(
+              `Voucher "${voucherCode}" has reached its maximum total usage limit (${vRec.usage_limit}).`
+            );
+          }
+
+          // Check once per customer flag
+          if (vRec.once_per_customer === 1) {
+            const custId =
+              dto.customerId && String(dto.customerId) !== "walk-in" && !isNaN(Number(dto.customerId))
+                ? Number(dto.customerId)
+                : null;
+            const custPhone = dto.customerPhone?.trim() || "";
+
+            if (custId || custPhone) {
+              const [priorUse]: any = await conn.query(
+                `SELECT id, invoice_no, customer_name FROM transactions
+                 WHERE voucher_id = ?
+                   AND ((? IS NOT NULL AND customer_id = ?) OR (? != '' AND customer_phone = ?))
+                   AND deleted_at IS NULL
+                 LIMIT 1`,
+                [voucherId, custId, custId, custPhone, custPhone]
+              );
+              if (priorUse.length > 0) {
+                throw new Error(
+                  `Customer "${dto.customerName || custPhone}" has already redeemed voucher "${voucherCode}" (Invoice: ${priorUse[0].invoice_no}). This voucher is limited to 1 use per customer.`
+                );
+              }
+            }
+          }
         }
       }
 
