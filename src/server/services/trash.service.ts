@@ -130,10 +130,27 @@ export class TrashService {
           );
         }
       } else if (moduleKey === "stock_ins") {
-        await conn.query(
-          `UPDATE products SET stock = stock + ?, updated_at = NOW() WHERE id = ?`,
-          [record.qty, record.product_id]
+        const [items]: any = await conn.query(
+          `SELECT * FROM stock_in_items WHERE stock_in_id = ?`,
+          [id]
         );
+        if (items.length > 0) {
+          for (const item of items) {
+            await conn.query(
+              `UPDATE products SET stock = stock + ?, updated_at = NOW() WHERE id = ?`,
+              [item.qty, item.product_id]
+            );
+          }
+          await conn.query(
+            `UPDATE stock_in_items SET deleted_at = NULL, deleted_by = NULL WHERE stock_in_id = ?`,
+            [id]
+          );
+        } else if (record.product_id && record.qty > 0) {
+          await conn.query(
+            `UPDATE products SET stock = stock + ?, updated_at = NOW() WHERE id = ?`,
+            [record.qty, record.product_id]
+          );
+        }
       }
 
       await conn.query(
@@ -186,6 +203,11 @@ export class TrashService {
       if (moduleKey === "transactions") {
         await conn.query(
           `DELETE FROM transaction_items WHERE transaction_id = ?`,
+          [id]
+        );
+      } else if (moduleKey === "stock_ins") {
+        await conn.query(
+          `DELETE FROM stock_in_items WHERE stock_in_id = ?`,
           [id]
         );
       }

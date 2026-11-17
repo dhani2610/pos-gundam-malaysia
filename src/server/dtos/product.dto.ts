@@ -11,10 +11,22 @@ export interface ProductDto {
   price: number;
 }
 
-export interface StockInDto {
-  idCabang: number;
+export interface StockInItemInput {
   productId: number;
   qty: number;
+  costPrice?: number;
+}
+
+export interface StockInDto {
+  idCabang: number;
+  productId?: number;
+  qty?: number;
+  costPrice?: number;
+  referenceNo?: string;
+  invoiceNo?: string;
   supplier?: string;
+  invoiceFile?: string;
+  invoiceFileName?: string;
   note?: string;
+  items?: StockInItemInput[];
 }

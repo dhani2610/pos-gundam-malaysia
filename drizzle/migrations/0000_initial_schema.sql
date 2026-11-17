@@ -114,11 +114,16 @@ CREATE TABLE IF NOT EXISTS `stock_ins` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `id_cabang` INT NOT NULL,
   `reference_no` VARCHAR(100) NOT NULL,
-  `product_id` INT NOT NULL,
-  `qty` INT NOT NULL,
+  `invoice_no` VARCHAR(100) NULL,
+  `product_id` INT NULL,
+  `qty` INT NOT NULL DEFAULT 0,
+  `total_amount` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `previous_stock` INT NOT NULL DEFAULT 0,
   `new_stock` INT NOT NULL DEFAULT 0,
   `supplier` VARCHAR(150) NULL,
+  `invoice_file` VARCHAR(500) NULL,
+  `invoice_file_name` VARCHAR(255) NULL,
+  `total_items` INT NOT NULL DEFAULT 1,
   `note` TEXT NULL,
   `user_id` INT NOT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -126,7 +131,24 @@ CREATE TABLE IF NOT EXISTS `stock_ins` (
   `deleted_at` DATETIME NULL,
   `deleted_by` INT NULL,
   INDEX `idx_stock_ins_cabang_deleted` (`id_cabang`, `deleted_at`),
-  INDEX `idx_stock_ins_product` (`product_id`)
+  INDEX `idx_stock_ins_product` (`product_id`),
+  INDEX `idx_stock_ins_supplier` (`supplier`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `stock_in_items` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `stock_in_id` INT NOT NULL,
+  `product_id` INT NOT NULL,
+  `qty` INT NOT NULL,
+  `cost_price` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `subtotal` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+  `previous_stock` INT NOT NULL DEFAULT 0,
+  `new_stock` INT NOT NULL DEFAULT 0,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_at` DATETIME NULL,
+  `deleted_by` INT NULL,
+  INDEX `idx_stock_in_items_stock_in` (`stock_in_id`),
+  INDEX `idx_stock_in_items_product` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `transactions` (

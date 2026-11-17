@@ -196,11 +196,18 @@ export const stockIns = mysqlTable(
     id: int("id").primaryKey().autoincrement(),
     idCabang: int("id_cabang").notNull(),
     referenceNo: varchar("reference_no", { length: 100 }).notNull(),
-    productId: int("product_id").notNull(),
-    qty: int("qty").notNull(),
+    invoiceNo: varchar("invoice_no", { length: 100 }),
+    productId: int("product_id"),
+    qty: int("qty").default(0).notNull(),
+    totalAmount: decimal("total_amount", { precision: 15, scale: 2 })
+      .default("0.00")
+      .notNull(),
     previousStock: int("previous_stock").default(0).notNull(),
     newStock: int("new_stock").default(0).notNull(),
     supplier: varchar("supplier", { length: 150 }),
+    invoiceFile: varchar("invoice_file", { length: 500 }),
+    invoiceFileName: varchar("invoice_file_name", { length: 255 }),
+    totalItems: int("total_items").default(1).notNull(),
     note: text("note"),
     userId: int("user_id").notNull(),
     createdAt: datetime("created_at")
@@ -215,6 +222,34 @@ export const stockIns = mysqlTable(
   (table) => [
     index("idx_stock_ins_cabang_deleted").on(table.idCabang, table.deletedAt),
     index("idx_stock_ins_product").on(table.productId),
+    index("idx_stock_ins_supplier").on(table.supplier),
+  ]
+);
+
+export const stockInItems = mysqlTable(
+  "stock_in_items",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    stockInId: int("stock_in_id").notNull(),
+    productId: int("product_id").notNull(),
+    qty: int("qty").notNull(),
+    costPrice: decimal("cost_price", { precision: 15, scale: 2 })
+      .default("0.00")
+      .notNull(),
+    subtotal: decimal("subtotal", { precision: 15, scale: 2 })
+      .default("0.00")
+      .notNull(),
+    previousStock: int("previous_stock").default(0).notNull(),
+    newStock: int("new_stock").default(0).notNull(),
+    createdAt: datetime("created_at")
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+    deletedAt: datetime("deleted_at"),
+    deletedBy: int("deleted_by"),
+  },
+  (table) => [
+    index("idx_stock_in_items_stock_in").on(table.stockInId),
+    index("idx_stock_in_items_product").on(table.productId),
   ]
 );
 

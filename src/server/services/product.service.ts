@@ -107,10 +107,13 @@ export class ProductService {
 
   // ================= STOCK IN (PRODUCT MASUK) =================
   static async getStockIns(idCabang: number) {
-    const [rows] = await pool.query(
-      `SELECT si.id, si.id_cabang as idCabang, si.reference_no as referenceNo, si.product_id as productId,
-              si.qty, si.previous_stock as previousStock, si.new_stock as newStock,
-              si.supplier, si.note, si.user_id as userId, si.created_at as createdAt,
+    const [rows]: any = await pool.query(
+      `SELECT si.id, si.id_cabang as idCabang, si.reference_no as referenceNo,
+              si.invoice_no as invoiceNo, si.product_id as productId,
+              si.qty, si.total_amount as totalAmount, si.total_items as totalItems,
+              si.previous_stock as previousStock, si.new_stock as newStock,
+              si.supplier, si.invoice_file as invoiceFile, si.invoice_file_name as invoiceFileName,
+              si.note, si.user_id as userId, si.created_at as createdAt,
               p.name as productName, p.product_code as productCode, p.image as productImage,
               u.name as userName, b.name as branchName
        FROM stock_ins si
@@ -121,6 +124,58 @@ export class ProductService {
        ORDER BY si.id DESC`,
       [idCabang, idCabang]
     );
+
+    if (rows.length > 0) {
+      const ids = rows.map((r: any) => r.id);
+      const [itemRows]: any = await pool.query(
+        `SELECT sii.id, sii.stock_in_id as stockInId, sii.product_id as productId,
+                sii.qty, sii.cost_price as costPrice, sii.subtotal,
+                sii.previous_stock as previousStock, sii.new_stock as newStock,
+                p.name as productName, p.product_code as productCode, p.image as productImage
+         FROM stock_in_items sii
+         JOIN products p ON sii.product_id = p.id
+         WHERE sii.stock_in_id IN (?) AND sii.deleted_at IS NULL
+         ORDER BY sii.id ASC`,
+        [ids]
+      );
+
+      const itemsByStockInId: Record<number, any[]> = {};
+      for (const item of itemRows) {
+        if (!itemsByStockInId[item.stockInId]) itemsByStockInId[item.stockInId] = [];
+        itemsByStockInId[item.stockInId].push(item);
+      }
+
+      for (const row of rows) {
+        const items = itemsByStockInId[row.id] || [];
+        if (items.length > 0) {
+          row.items = items;
+          row.totalItems = items.length;
+          row.qty = items.reduce((sum: number, it: any) => sum + Number(it.qty || 0), 0);
+          row.totalAmount = items.reduce((sum: number, it: any) => sum + Number(it.subtotal || 0), 0);
+        } else if (row.productId && row.productName) {
+          // Backward compatibility for legacy single-item stock-in
+          row.items = [
+            {
+              id: 0,
+              stockInId: row.id,
+              productId: row.productId,
+              productCode: row.productCode,
+              productName: row.productName,
+              productImage: row.productImage,
+              qty: row.qty,
+              costPrice: 0,
+              subtotal: 0,
+              previousStock: row.previousStock,
+              newStock: row.newStock,
+            },
+          ];
+          row.totalItems = 1;
+        } else {
+          row.items = [];
+        }
+      }
+    }
+
     return rows;
   }
 
@@ -129,65 +184,147 @@ export class ProductService {
     try {
       await conn.beginTransaction();
 
-      const [prodRows]: any = await conn.query(
-        `SELECT * FROM products WHERE id = ? AND deleted_at IS NULL FOR UPDATE`,
-        [dto.productId]
-      );
-      const product = prodRows[0];
-      if (!product) {
-        throw new Error("Selected product not found");
+      // Normalize items: can be dto.items array OR single product
+      let itemsToProcess = dto.items && dto.items.length > 0 ? dto.items : [];
+      if (itemsToProcess.length === 0 && dto.productId && dto.qty) {
+        itemsToProcess.push({
+          productId: dto.productId,
+          qty: dto.qty,
+          costPrice: dto.costPrice || 0,
+        });
       }
 
-      const qty = Number(dto.qty);
-      if (qty <= 0) {
-        throw new Error("Stock-in quantity must be greater than 0");
+      if (itemsToProcess.length === 0) {
+        throw new Error("Please add at least one product item to stock in");
       }
 
-      const previousStock = Number(product.stock || 0);
-      const newStock = previousStock + qty;
-      const refNo = `STK-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`;
+      // Filter and validate items
+      const validItems: any[] = [];
+      let totalQty = 0;
+      let totalAmount = 0;
 
-      const [res]: any = await conn.query(
-        `INSERT INTO stock_ins (id_cabang, reference_no, product_id, qty, previous_stock, new_stock, supplier, note, user_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          dto.idCabang || product.id_cabang,
-          refNo,
-          dto.productId,
+      for (const item of itemsToProcess) {
+        const pid = Number(item.productId);
+        const qty = Number(item.qty);
+        const costPrice = Number(item.costPrice || 0);
+
+        if (!pid || isNaN(pid)) continue;
+        if (qty <= 0 || isNaN(qty)) {
+          throw new Error("Quantity for each product item must be greater than 0");
+        }
+
+        const [prodRows]: any = await conn.query(
+          `SELECT id, id_cabang, name, product_code, stock, price FROM products WHERE id = ? AND deleted_at IS NULL FOR UPDATE`,
+          [pid]
+        );
+        const product = prodRows[0];
+        if (!product) {
+          throw new Error(`Product with ID ${pid} not found or has been deleted`);
+        }
+
+        const previousStock = Number(product.stock || 0);
+        const newStock = previousStock + qty;
+        const subtotal = Math.round(qty * costPrice * 100) / 100;
+
+        totalQty += qty;
+        totalAmount += subtotal;
+
+        validItems.push({
+          product,
+          productId: pid,
           qty,
+          costPrice,
+          subtotal,
           previousStock,
           newStock,
-          dto.supplier || "Direct Restock",
-          dto.note || "",
+        });
+      }
+
+      if (validItems.length === 0) {
+        throw new Error("No valid product items provided");
+      }
+
+      const branchId = dto.idCabang || validItems[0].product.id_cabang;
+      const refNo =
+        dto.referenceNo?.trim() ||
+        `STK-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const firstItem = validItems[0];
+
+      // Insert master stock_ins row
+      const [res]: any = await conn.query(
+        `INSERT INTO stock_ins (
+           id_cabang, reference_no, invoice_no, product_id, qty, total_amount,
+           previous_stock, new_stock, supplier, invoice_file, invoice_file_name,
+           total_items, note, user_id
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          branchId,
+          refNo,
+          dto.invoiceNo?.trim() || null,
+          validItems.length === 1 ? firstItem.productId : null,
+          totalQty,
+          totalAmount,
+          validItems.length === 1 ? firstItem.previousStock : 0,
+          validItems.length === 1 ? firstItem.newStock : 0,
+          dto.supplier?.trim() || "Supplier",
+          dto.invoiceFile || null,
+          dto.invoiceFileName || null,
+          validItems.length,
+          dto.note?.trim() || "",
           actor.id,
         ]
       );
 
-      await conn.query(
-        `UPDATE products SET stock = ?, updated_at = NOW() WHERE id = ?`,
-        [newStock, dto.productId]
-      );
+      const stockInId = res.insertId;
+
+      // Insert into stock_in_items and update products stock
+      for (const it of validItems) {
+        await conn.query(
+          `INSERT INTO stock_in_items (
+             stock_in_id, product_id, qty, cost_price, subtotal, previous_stock, new_stock
+           ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            stockInId,
+            it.productId,
+            it.qty,
+            it.costPrice,
+            it.subtotal,
+            it.previousStock,
+            it.newStock,
+          ]
+        );
+
+        await conn.query(
+          `UPDATE products SET stock = ?, updated_at = NOW() WHERE id = ?`,
+          [it.newStock, it.productId]
+        );
+      }
 
       await conn.commit();
 
+      const itemNames = validItems
+        .map((v) => `${v.product.name} (+${v.qty})`)
+        .join(", ");
       await LogService.record({
-        idCabang: dto.idCabang || product.id_cabang,
+        idCabang: branchId,
         user: actor,
         module: "Stock In",
         action: "STOCK_IN",
-        targetId: res.insertId,
-        description: `Stock In +${qty} units for "${product.name}" (Stock: ${previousStock} -> ${newStock})`,
+        targetId: stockInId,
+        description: `Stock In ${refNo} from "${dto.supplier || "Supplier"}" (${validItems.length} items, +${totalQty} pcs total): ${itemNames}`,
         metadata: {
+          stockInId,
           referenceNo: refNo,
-          productId: dto.productId,
-          productName: product.name,
-          qty,
-          previousStock,
-          newStock,
+          invoiceNo: dto.invoiceNo,
+          supplier: dto.supplier,
+          invoiceFile: dto.invoiceFile,
+          totalItems: validItems.length,
+          totalQty,
+          totalAmount,
         },
       });
 
-      return res.insertId;
+      return stockInId;
     } catch (err) {
       await conn.rollback();
       throw err;
@@ -207,11 +344,30 @@ export class ProductService {
       const stockIn = rows[0];
       if (!stockIn) throw new Error("Stock-in record not found");
 
-      // Deduct the stock back when soft-deleting a Stock In entry
-      await conn.query(
-        `UPDATE products SET stock = GREATEST(0, stock - ?), updated_at = NOW() WHERE id = ?`,
-        [stockIn.qty, stockIn.product_id]
+      // Check for stock_in_items
+      const [items]: any = await conn.query(
+        `SELECT * FROM stock_in_items WHERE stock_in_id = ? AND deleted_at IS NULL`,
+        [id]
       );
+
+      if (items.length > 0) {
+        for (const it of items) {
+          await conn.query(
+            `UPDATE products SET stock = GREATEST(0, stock - ?), updated_at = NOW() WHERE id = ?`,
+            [it.qty, it.product_id]
+          );
+        }
+        await conn.query(
+          `UPDATE stock_in_items SET deleted_at = NOW(), deleted_by = ? WHERE stock_in_id = ?`,
+          [actor.id, id]
+        );
+      } else if (stockIn.product_id && stockIn.qty > 0) {
+        // Legacy single item
+        await conn.query(
+          `UPDATE products SET stock = GREATEST(0, stock - ?), updated_at = NOW() WHERE id = ?`,
+          [stockIn.qty, stockIn.product_id]
+        );
+      }
 
       await conn.query(
         `UPDATE stock_ins SET deleted_at = NOW(), deleted_by = ? WHERE id = ?`,
@@ -226,7 +382,7 @@ export class ProductService {
         module: "Stock In",
         action: "SOFT_DELETE",
         targetId: id,
-        description: `Soft-deleted Stock In ${stockIn.reference_no} (-${stockIn.qty} units reverted)`,
+        description: `Soft-deleted Stock In ${stockIn.reference_no} (-${stockIn.qty} total units reverted)`,
       });
     } catch (err) {
       await conn.rollback();
