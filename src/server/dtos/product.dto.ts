@@ -8,6 +8,7 @@ export interface ProductDto {
   subCategoryId: number;
   brandId: number;
   stock: number;
+  costPrice?: number;
   price: number;
 }
 

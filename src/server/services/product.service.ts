@@ -8,7 +8,7 @@ export class ProductService {
     const [rows] = await pool.query(
       `SELECT p.id, p.id_cabang as idCabang, p.product_code as productCode, p.name, p.image,
               p.category_id as categoryId, p.sub_category_id as subCategoryId, p.brand_id as brandId,
-              p.stock, p.price, p.created_at as createdAt,
+              p.stock, p.cost_price as costPrice, p.price, p.created_at as createdAt,
               c.name as categoryName, sc.name as subCategoryName, br.name as brandName, b.name as branchName
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
@@ -24,8 +24,8 @@ export class ProductService {
 
   static async createProduct(dto: ProductDto, actor: SessionUser) {
     const [res]: any = await pool.query(
-      `INSERT INTO products (id_cabang, product_code, name, image, category_id, sub_category_id, brand_id, stock, price)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO products (id_cabang, product_code, name, image, category_id, sub_category_id, brand_id, stock, cost_price, price)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dto.idCabang,
         dto.productCode.trim(),
@@ -35,6 +35,7 @@ export class ProductService {
         dto.subCategoryId,
         dto.brandId,
         Number(dto.stock || 0),
+        Number(dto.costPrice || 0),
         Number(dto.price || 0),
       ]
     );
@@ -45,7 +46,7 @@ export class ProductService {
       module: "Products",
       action: "CREATE",
       targetId: res.insertId,
-      description: `Created product "${dto.name}" (Code: ${dto.productCode}, Price: RM ${Number(dto.price).toFixed(2)}, Initial Stock: ${dto.stock})`,
+      description: `Created product "${dto.name}" (Code: ${dto.productCode}, Cost: RM ${Number(dto.costPrice || 0).toFixed(2)}, Price: RM ${Number(dto.price).toFixed(2)}, Initial Stock: ${dto.stock})`,
       metadata: { ...dto, id: res.insertId },
     });
     return res.insertId;
@@ -59,7 +60,7 @@ export class ProductService {
 
     await pool.query(
       `UPDATE products
-       SET id_cabang = ?, product_code = ?, name = ?, image = ?, category_id = ?, sub_category_id = ?, brand_id = ?, stock = ?, price = ?, updated_at = NOW()
+       SET id_cabang = ?, product_code = ?, name = ?, image = ?, category_id = ?, sub_category_id = ?, brand_id = ?, stock = ?, cost_price = ?, price = ?, updated_at = NOW()
        WHERE id = ?`,
       [
         dto.idCabang,
@@ -70,6 +71,7 @@ export class ProductService {
         dto.subCategoryId,
         dto.brandId,
         Number(dto.stock || 0),
+        Number(dto.costPrice || 0),
         Number(dto.price || 0),
         id,
       ]
@@ -81,7 +83,7 @@ export class ProductService {
       module: "Products",
       action: "UPDATE",
       targetId: id,
-      description: `Updated product "${dto.name}" (Code: ${dto.productCode}, Price: RM ${Number(dto.price).toFixed(2)}, Stock: ${dto.stock})`,
+      description: `Updated product "${dto.name}" (Code: ${dto.productCode}, Cost: RM ${Number(dto.costPrice || 0).toFixed(2)}, Price: RM ${Number(dto.price).toFixed(2)}, Stock: ${dto.stock})`,
       metadata: {
         before: existing[0] || null,
         after: dto,
@@ -295,8 +297,8 @@ export class ProductService {
         );
 
         await conn.query(
-          `UPDATE products SET stock = ?, updated_at = NOW() WHERE id = ?`,
-          [it.newStock, it.productId]
+          `UPDATE products SET stock = ?, cost_price = CASE WHEN ? > 0 THEN ? ELSE cost_price END, updated_at = NOW() WHERE id = ?`,
+          [it.newStock, it.costPrice, it.costPrice, it.productId]
         );
       }
 

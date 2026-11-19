@@ -87,6 +87,7 @@ export default function ProductsPage() {
     subCategoryId: "",
     brandId: "",
     stock: "0",
+    costPrice: "0.00",
     price: "",
   });
 
@@ -202,6 +203,7 @@ export default function ProductsPage() {
       subCategoryId: matchingSub ? String(matchingSub.id) : "",
       brandId: brands[0]?.id ? String(brands[0].id) : "",
       stock: "10",
+      costPrice: "65.00",
       price: "95.00",
     });
     setModalOpen(true);
@@ -218,6 +220,7 @@ export default function ProductsPage() {
       subCategoryId: String(prod.subCategoryId),
       brandId: String(prod.brandId),
       stock: String(prod.stock),
+      costPrice: String(prod.costPrice ?? "0.00"),
       price: String(prod.price),
     });
     setModalOpen(true);
@@ -287,6 +290,7 @@ export default function ProductsPage() {
           subCategoryId: Number(form.subCategoryId),
           brandId: Number(form.brandId),
           stock: Number(form.stock),
+          costPrice: Number(form.costPrice || 0),
           price: Number(form.price),
         }),
       });
@@ -398,10 +402,19 @@ export default function ProductsPage() {
       },
     },
     {
-      accessorKey: "price",
-      header: "Unit Price (RM)",
+      accessorKey: "costPrice",
+      header: "Cost Price / Modal (RM)",
       cell: ({ row }) => (
-        <span className="font-mono font-extrabold text-xs">
+        <span className="font-mono text-xs text-slate-600 font-semibold">
+          {formatRM(row.original.costPrice || 0)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "price",
+      header: "Selling Price / Jual (RM)",
+      cell: ({ row }) => (
+        <span className="font-mono font-extrabold text-xs text-blue-700">
           {formatRM(row.original.price)}
         </span>
       ),
@@ -930,7 +943,7 @@ export default function ProductsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label>Stock Quantity *</Label>
                 <Input
@@ -946,16 +959,33 @@ export default function ProductsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label>Unit Price (RM) *</Label>
+                <Label>Cost Price / Modal (RM) *</Label>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="any"
                   min={0}
+                  placeholder="0.00"
+                  value={form.costPrice}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, costPrice: e.target.value }))
+                  }
+                  className="font-mono"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Selling Price / Jual (RM) *</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min={0}
+                  placeholder="0.00"
                   value={form.price}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, price: e.target.value }))
                   }
-                  className="font-mono font-bold"
+                  className="font-mono font-bold text-blue-700"
                   required
                 />
               </div>

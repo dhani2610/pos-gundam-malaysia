@@ -167,6 +167,9 @@ export const products = mysqlTable(
     subCategoryId: int("sub_category_id").notNull(),
     brandId: int("brand_id").notNull(),
     stock: int("stock").default(0).notNull(),
+    costPrice: decimal("cost_price", { precision: 15, scale: 2 })
+      .default("0.00")
+      .notNull(),
     price: decimal("price", { precision: 15, scale: 2 })
       .default("0.00")
       .notNull(),
