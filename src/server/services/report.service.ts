@@ -32,8 +32,17 @@ export class ReportService {
          COUNT(t.id) as totalTransactions,
          COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN t.net_total ELSE 0 END), 0) as todayNetRevenue,
          COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN t.tax_amount ELSE 0 END), 0) as todayTaxRevenue,
-         COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN t.gross_total ELSE 0 END), 0) as todayGrossRevenue
+         COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN t.gross_total ELSE 0 END), 0) as todayGrossRevenue,
+         COALESCE(SUM(cogs_sub.tx_cogs), 0) as totalCogs,
+         COALESCE(SUM(CASE WHEN DATE(t.created_at) = CURDATE() THEN cogs_sub.tx_cogs ELSE 0 END), 0) as todayCogs
        FROM transactions t
+       LEFT JOIN (
+         SELECT ti.transaction_id, SUM(ti.qty * COALESCE(NULLIF(ti.cost_price, 0), p.cost_price, 0)) as tx_cogs
+         FROM transaction_items ti
+         LEFT JOIN products p ON ti.product_id = p.id
+         WHERE ti.deleted_at IS NULL
+         GROUP BY ti.transaction_id
+       ) cogs_sub ON cogs_sub.transaction_id = t.id
        WHERE t.deleted_at IS NULL AND (? = 0 OR t.id_cabang = ?) ${userFilterSql} ${dateFilterSql}`,
       filterParams
     );
@@ -67,11 +76,47 @@ export class ReportService {
          DATE(t.created_at) as rawDate,
          COALESCE(SUM(t.gross_total), 0) as grossRevenue,
          COALESCE(SUM(t.net_total), 0) as netRevenue,
+         COALESCE(SUM(cogs_sub.tx_cogs), 0) as totalCost,
+         COALESCE(SUM(t.net_total - t.tax_amount) - SUM(cogs_sub.tx_cogs), 0) as netProfit,
          COUNT(t.id) as transactions
        FROM transactions t
+       LEFT JOIN (
+         SELECT ti.transaction_id, SUM(ti.qty * COALESCE(NULLIF(ti.cost_price, 0), p.cost_price, 0)) as tx_cogs
+         FROM transaction_items ti
+         LEFT JOIN products p ON ti.product_id = p.id
+         WHERE ti.deleted_at IS NULL
+         GROUP BY ti.transaction_id
+       ) cogs_sub ON cogs_sub.transaction_id = t.id
        WHERE t.deleted_at IS NULL AND (? = 0 OR t.id_cabang = ?) ${userFilterSql} ${dateFilterSql}
        GROUP BY DATE(t.created_at), DATE_FORMAT(t.created_at, '%b %d')
        ORDER BY rawDate ASC
+       LIMIT 31`,
+      filterParams
+    );
+
+    const [dailyProfitLossRows]: any = await pool.query(
+      `SELECT
+         DATE(t.created_at) as rawDate,
+         DATE_FORMAT(t.created_at, '%d %b %Y') as dateFormatted,
+         DATE_FORMAT(t.created_at, '%W') as dayName,
+         COUNT(t.id) as totalTransactions,
+         COALESCE(SUM(t.gross_total), 0) as grossRevenue,
+         COALESCE(SUM(t.discount_total), 0) as discountTotal,
+         COALESCE(SUM(t.tax_amount), 0) as taxAmount,
+         COALESCE(SUM(t.net_total), 0) as netRevenue,
+         COALESCE(SUM(cogs_sub.tx_cogs), 0) as totalCost,
+         COALESCE(SUM(t.net_total - t.tax_amount) - SUM(cogs_sub.tx_cogs), 0) as netProfit
+       FROM transactions t
+       LEFT JOIN (
+         SELECT ti.transaction_id, SUM(ti.qty * COALESCE(NULLIF(ti.cost_price, 0), p.cost_price, 0)) as tx_cogs
+         FROM transaction_items ti
+         LEFT JOIN products p ON ti.product_id = p.id
+         WHERE ti.deleted_at IS NULL
+         GROUP BY ti.transaction_id
+       ) cogs_sub ON cogs_sub.transaction_id = t.id
+       WHERE t.deleted_at IS NULL AND (? = 0 OR t.id_cabang = ?) ${userFilterSql} ${dateFilterSql}
+       GROUP BY DATE(t.created_at), DATE_FORMAT(t.created_at, '%d %b %Y'), DATE_FORMAT(t.created_at, '%W')
+       ORDER BY rawDate DESC
        LIMIT 31`,
       filterParams
     );
@@ -93,26 +138,83 @@ export class ReportService {
       filterParams
     );
 
+    const grossRevenue = Number(totals[0]?.grossRevenue || 0);
+    const totalDiscount = Number(totals[0]?.totalDiscount || 0);
+    const totalTax = Number(totals[0]?.totalTax || 0);
+    const netRevenue = Number(totals[0]?.netRevenue || 0);
+    const totalCogs = Number(totals[0]?.totalCogs || 0);
+    const revenueExcludingTax = Math.max(0, netRevenue - totalTax);
+    const totalNetProfit = Number((revenueExcludingTax - totalCogs).toFixed(2));
+    const totalMarginPercent =
+      revenueExcludingTax > 0
+        ? Number(((totalNetProfit / revenueExcludingTax) * 100).toFixed(2))
+        : 0;
+
+    const todayNetRevenue = Number(totals[0]?.todayNetRevenue || 0);
+    const todayTaxRevenue = Number(totals[0]?.todayTaxRevenue || 0);
+    const todayGrossRevenue = Number(totals[0]?.todayGrossRevenue || 0);
+    const todayCogs = Number(totals[0]?.todayCogs || 0);
+    const todayRevenueExcludingTax = Math.max(0, todayNetRevenue - todayTaxRevenue);
+    const todayNetProfit = Number((todayRevenueExcludingTax - todayCogs).toFixed(2));
+    const todayMarginPercent =
+      todayRevenueExcludingTax > 0
+        ? Number(((todayNetProfit / todayRevenueExcludingTax) * 100).toFixed(2))
+        : 0;
+
+    const dailyProfitLoss = dailyProfitLossRows.map((r: any) => {
+      const netRev = Number(r.netRevenue || 0);
+      const tax = Number(r.taxAmount || 0);
+      const cost = Number(r.totalCost || 0);
+      const baseRev = Math.max(0, netRev - tax);
+      const profit = Number(r.netProfit || 0);
+      const margin =
+        baseRev > 0 ? Number(((profit / baseRev) * 100).toFixed(2)) : 0;
+
+      return {
+        rawDate: r.rawDate,
+        dateFormatted: r.dateFormatted,
+        dayName: r.dayName,
+        totalTransactions: Number(r.totalTransactions || 0),
+        grossRevenue: Number(r.grossRevenue || 0),
+        discountTotal: Number(r.discountTotal || 0),
+        taxAmount: tax,
+        netRevenue: netRev,
+        totalCost: cost,
+        netProfit: profit,
+        profitMargin: margin,
+        status: profit >= 0 ? "PROFIT" : "LOSS",
+      };
+    });
+
     return {
       overview: {
-        grossRevenue: Number(totals[0]?.grossRevenue || 0),
-        totalDiscount: Number(totals[0]?.totalDiscount || 0),
-        totalTax: Number(totals[0]?.totalTax || 0),
-        netRevenue: Number(totals[0]?.netRevenue || 0),
+        grossRevenue,
+        totalDiscount,
+        totalTax,
+        netRevenue,
+        totalCogs,
+        totalNetProfit,
+        totalMarginPercent,
         totalTransactions: Number(totals[0]?.totalTransactions || 0),
-        todayNetRevenue: Number(totals[0]?.todayNetRevenue || 0),
-        todayTaxRevenue: Number(totals[0]?.todayTaxRevenue || 0),
-        todayGrossRevenue: Number(totals[0]?.todayGrossRevenue || 0),
+        todayNetRevenue,
+        todayTaxRevenue,
+        todayGrossRevenue,
+        todayCogs,
+        todayNetProfit,
+        todayMarginPercent,
         totalProducts: Number(stockSummary[0]?.totalProducts || 0),
         totalUnitsInStock: Number(stockSummary[0]?.totalUnitsInStock || 0),
         lowStockCount: Number(stockSummary[0]?.lowStockCount || 0),
       },
       chartData: chartRows.map((r: any) => ({
         label: r.label,
-        grossRevenue: Number(r.grossRevenue),
-        netRevenue: Number(r.netRevenue),
-        transactions: Number(r.transactions),
+        grossRevenue: Number(r.grossRevenue || 0),
+        netRevenue: Number(r.netRevenue || 0),
+        totalCost: Number(r.totalCost || 0),
+        netProfit: Number(r.netProfit || 0),
+        transactions: Number(r.transactions || 0),
       })),
+      dailyProfitLoss,
       topProducts,
       lowStockProducts,
     };

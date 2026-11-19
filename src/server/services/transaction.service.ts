@@ -144,10 +144,11 @@ export class TransactionService {
         originalPrice: number;
         customPrice: number;
       }> = [];
+      const prodCostMap = new Map<number, number>();
 
       for (const item of dto.items) {
         const [prodRows]: any = await conn.query(
-          `SELECT id, name, stock, price FROM products WHERE id = ? AND deleted_at IS NULL FOR UPDATE`,
+          `SELECT id, name, stock, price, cost_price FROM products WHERE id = ? AND deleted_at IS NULL FOR UPDATE`,
           [item.productId]
         );
         const prod = prodRows[0];
@@ -162,6 +163,8 @@ export class TransactionService {
 
         const customPrice = Number(item.customPrice);
         const originalPrice = Number(prod.price);
+        const costPrice = Number(prod.cost_price || 0);
+        prodCostMap.set(Number(item.productId), costPrice);
         const qty = Number(item.qty);
         const discount = Number(item.discountAmount || 0);
 
@@ -350,17 +353,19 @@ export class TransactionService {
         const discount = Number(item.discountAmount || 0);
         const grossSub = customPrice * qty;
         const netSub = Math.max(0, grossSub - discount);
+        const costPrice = prodCostMap.get(Number(item.productId)) ?? 0;
 
         await conn.query(
           `INSERT INTO transaction_items
-           (id_cabang, transaction_id, product_id, product_code, product_name, original_price, custom_price, qty, discount_type, discount_value, discount_amount, gross_subtotal, net_subtotal)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id_cabang, transaction_id, product_id, product_code, product_name, cost_price, original_price, custom_price, qty, discount_type, discount_value, discount_amount, gross_subtotal, net_subtotal)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             dto.idCabang,
             txId,
             item.productId,
             item.productCode,
             item.productName,
+            costPrice,
             Number(item.originalPrice),
             customPrice,
             qty,

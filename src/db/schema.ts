@@ -397,6 +397,9 @@ export const transactionItems = mysqlTable(
     productId: int("product_id").notNull(),
     productCode: varchar("product_code", { length: 100 }).notNull(),
     productName: varchar("product_name", { length: 255 }).notNull(),
+    costPrice: decimal("cost_price", { precision: 15, scale: 2 })
+      .default("0.00")
+      .notNull(),
     originalPrice: decimal("original_price", { precision: 15, scale: 2 })
       .default("0.00")
       .notNull(),

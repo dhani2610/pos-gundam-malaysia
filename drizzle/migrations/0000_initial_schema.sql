@@ -218,6 +218,7 @@ CREATE TABLE IF NOT EXISTS `transaction_items` (
   `product_id` INT NOT NULL,
   `product_code` VARCHAR(100) NOT NULL,
   `product_name` VARCHAR(255) NOT NULL,
+  `cost_price` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `original_price` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `custom_price` DECIMAL(15,2) NOT NULL DEFAULT 0.00,
   `qty` INT NOT NULL DEFAULT 1,
